@@ -30,12 +30,12 @@ class GaussianBlur:
 
     CATEGORY = "postprocessing"
 
-    def blur(self, image, kernel_size, sigma):
-        tensor_img = image.numpy()[0]
-        blurred = cv2.GaussianBlur(tensor_img, (kernel_size, kernel_size), sigma)
+    def blur(self, image: torch.Tensor, kernel_size: int, sigma: float):
+        tensor_image = image.numpy()[0]
+        blurred = cv2.GaussianBlur(tensor_image, (kernel_size, kernel_size), sigma)
         tensor = torch.from_numpy(blurred).unsqueeze(0)
         return (tensor,)
-    
+
 NODE_CLASS_MAPPINGS = {
     "GaussianBlur": GaussianBlur
 }

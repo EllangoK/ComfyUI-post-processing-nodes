@@ -56,8 +56,8 @@ class ColorCorrect:
 
     CATEGORY = "postprocessing"
 
-    def color_correct(self, image, temperature, hue, brightness, contrast, saturation, gamma):
-        tensor_img = image.numpy()[0]
+    def color_correct(self, image: torch.Tensor, temperature: float, hue: float, brightness: float, contrast: float, saturation: float, gamma: float):
+        tensor_image = image.numpy()[0]
 
         brightness /= 100
         contrast /= 100
@@ -68,8 +68,7 @@ class ColorCorrect:
         contrast = 1 + contrast
         saturation = 1 + saturation
 
-
-        modified_image = Image.fromarray((tensor_img * 255).astype(np.uint8))
+        modified_image = Image.fromarray((tensor_image * 255).astype(np.uint8))
 
         # brightness
         modified_image = ImageEnhance.Brightness(modified_image).enhance(brightness)
@@ -97,11 +96,9 @@ class ColorCorrect:
         # hue
         hsv_img = cv2.cvtColor(modified_image, cv2.COLOR_RGB2HSV)
         hsv_img[:, :, 0] = (hsv_img[:, :, 0] + hue) % 360
-
         modified_image = cv2.cvtColor(hsv_img, cv2.COLOR_HSV2RGB)
 
         modified_image = modified_image.astype(np.uint8)
-
         modified_image = modified_image / 255
         modified_image = torch.from_numpy(modified_image).unsqueeze(0)
 

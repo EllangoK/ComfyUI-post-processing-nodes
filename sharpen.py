@@ -31,17 +31,18 @@ class Sharpen:
 
     CATEGORY = "postprocessing"
 
-    def sharpen(self, image, alpha, kernel_size):
-        tensor_img = image.numpy()[0]
+    def sharpen(self, image: torch.Tensor, kernel_size: int, alpha: float):
+        tensor_image = image.numpy()[0]
 
         kernel = np.ones((kernel_size, kernel_size), dtype=np.float32) * -1
         center = kernel_size // 2
         kernel[center, center] = kernel_size**2
         kernel *= alpha
 
-        sharpened = cv2.filter2D(tensor_img, -1, kernel)
+        sharpened = cv2.filter2D(tensor_image, -1, kernel)
 
         tensor = torch.from_numpy(sharpened).unsqueeze(0)
+        tensor = torch.clamp(tensor, 0, 1)
         return (tensor,)
 
 NODE_CLASS_MAPPINGS = {
