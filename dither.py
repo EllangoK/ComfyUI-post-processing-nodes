@@ -1,5 +1,6 @@
 import torch
 
+
 class Dither:
     def __init__(self):
         pass
@@ -24,32 +25,38 @@ class Dither:
     CATEGORY = "postprocessing"
 
     def dither(self, image: torch.Tensor, bits: int):
-        tensor_image = image.numpy()[0]
-        img = (tensor_image * 255)
-        height, width, _ = img.shape
+        batch_size, height, width, _ = image.shape
+        result = torch.zeros_like(image)
 
-        scale = 255 / (2**bits - 1)
+        for b in range(batch_size):
+            tensor_image = image[b].numpy()
+            img = (tensor_image * 255)
+            height, width, _ = img.shape
 
-        for y in range(height):
-            for x in range(width):
-                old_pixel = img[y, x].copy()
-                new_pixel = np.round(old_pixel / scale) * scale
-                img[y, x] = new_pixel
+            scale = 255 / (2**bits - 1)
 
-                quant_error = old_pixel - new_pixel
+            for y in range(height):
+                for x in range(width):
+                    old_pixel = img[y, x].copy()
+                    new_pixel = np.round(old_pixel / scale) * scale
+                    img[y, x] = new_pixel
 
-                if x + 1 < width:
-                    img[y, x + 1] += quant_error * 7 / 16
-                if y + 1 < height:
-                    if x - 1 >= 0:
-                        img[y + 1, x - 1] += quant_error * 3 / 16
-                    img[y + 1, x] += quant_error * 5 / 16
+                    quant_error = old_pixel - new_pixel
+
                     if x + 1 < width:
-                        img[y + 1, x + 1] += quant_error * 1 / 16
+                        img[y, x + 1] += quant_error * 7 / 16
+                    if y + 1 < height:
+                        if x - 1 >= 0:
+                            img[y + 1, x - 1] += quant_error * 3 / 16
+                        img[y + 1, x] += quant_error * 5 / 16
+                        if x + 1 < width:
+                            img[y + 1, x + 1] += quant_error * 1 / 16
 
-        dithered = img / 255
-        tensor = torch.from_numpy(dithered).unsqueeze(0)
-        return (tensor,)
+            dithered = img / 255
+            tensor = torch.from_numpy(dithered).unsqueeze(0)
+            result[b] = tensor
+
+        return (result,)
 
 NODE_CLASS_MAPPINGS = {
     "Dither": Dither

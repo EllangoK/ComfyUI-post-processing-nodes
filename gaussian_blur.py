@@ -1,6 +1,7 @@
 import cv2
 import torch
 
+
 class GaussianBlur:
     def __init__(self):
         pass
@@ -31,10 +32,16 @@ class GaussianBlur:
     CATEGORY = "postprocessing"
 
     def blur(self, image: torch.Tensor, kernel_size: int, sigma: float):
-        tensor_image = image.numpy()[0]
-        blurred = cv2.GaussianBlur(tensor_image, (kernel_size, kernel_size), sigma)
-        tensor = torch.from_numpy(blurred).unsqueeze(0)
-        return (tensor,)
+        batch_size, height, width, _ = image.shape
+        result = torch.zeros_like(image)
+
+        for b in range(batch_size):
+            tensor_image = image[b].numpy()
+            blurred = cv2.GaussianBlur(tensor_image, (kernel_size, kernel_size), sigma)
+            tensor = torch.from_numpy(blurred).unsqueeze(0)
+            result[b] = tensor
+
+        return (result,)
 
 NODE_CLASS_MAPPINGS = {
     "GaussianBlur": GaussianBlur

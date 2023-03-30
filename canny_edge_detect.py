@@ -1,6 +1,7 @@
-import numpy as np
 import cv2
+import numpy as np
 import torch
+
 
 class CannyEdgeDetection:
     def __init__(self):
@@ -32,11 +33,17 @@ class CannyEdgeDetection:
     CATEGORY = "postprocessing"
 
     def canny(self, image: torch.Tensor, lower_threshold: int, upper_threshold: int):
-        tensor_image = image.numpy()[0]
-        gray_image = (cv2.cvtColor(tensor_image, cv2.COLOR_BGR2GRAY) * 255).astype(np.uint8)
-        canny = cv2.Canny(gray_image, lower_threshold, upper_threshold)
-        tensor = torch.from_numpy(canny).unsqueeze(0)
-        return (tensor,)
+        batch_size, height, width, _ = image.shape
+        result = torch.zeros(batch_size, height, width)
+
+        for b in range(batch_size):
+            tensor_image = image[b].numpy().copy()
+            gray_image = (cv2.cvtColor(tensor_image, cv2.COLOR_RGB2GRAY) * 255).astype(np.uint8)
+            canny = cv2.Canny(gray_image, lower_threshold, upper_threshold)
+            tensor = torch.from_numpy(canny)
+            result[b] = tensor
+
+        return (result,)
 
 NODE_CLASS_MAPPINGS = {
     "CannyEdgeDetection": CannyEdgeDetection

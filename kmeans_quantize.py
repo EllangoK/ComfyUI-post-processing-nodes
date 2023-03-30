@@ -1,6 +1,7 @@
-import numpy as np
 import cv2
+import numpy as np
 import torch
+
 
 class KMeansQuantize:
     def __init__(self):
@@ -32,22 +33,32 @@ class KMeansQuantize:
     CATEGORY = "postprocessing"
 
     def kmeans_quantize(self, image: torch.Tensor, colors: int, precision: int):
-        tensor_image = image.numpy()[0].astype(np.float32)
-        img = tensor_image
+        batch_size, height, width, _ = image.shape
+        result = torch.zeros_like(image)
 
-        height, width, c = img.shape
+        for b in range(batch_size):
+            tensor_image = image[b].numpy().astype(np.float32)
+            img = tensor_image
 
-        criteria = (
-            cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
-            precision * 5, 0.01
-        )
+            height, width, c = img.shape
 
-        img_copy = img.reshape(-1, c)
-        _, label, center = cv2.kmeans(
-            img_copy, colors, None,
-            criteria, 1, cv2.KMEANS_PP_CENTERS
-        )
+            criteria = (
+                cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
+                precision * 5, 0.01
+            )
 
-        result = center[label.flatten()].reshape(*img.shape)
-        tensor = torch.from_numpy(result).unsqueeze(0)
-        return (tensor,)
+            img_copy = img.reshape(-1, c)
+            _, label, center = cv2.kmeans(
+                img_copy, colors, None,
+                criteria, 1, cv2.KMEANS_PP_CENTERS
+            )
+
+            img = center[label.flatten()].reshape(*img.shape)
+            tensor = torch.from_numpy(img).unsqueeze(0)
+            result[b] = tensor
+
+        return (result,)
+
+NODE_CLASS_MAPPINGS = {
+    "KMeansQuantize": KMeansQuantize
+}

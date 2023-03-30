@@ -29,17 +29,22 @@ class PixelSort:
 
     CATEGORY = "postprocessing"
 
-    def sort_pixels(self, image, mask, direction, span_limit, sort_by, order):
+    def sort_pixels(self, image: torch.Tensor, mask: torch.Tensor, direction: str, span_limit: int, sort_by: str, order: str):
         horizontal_sort = direction == "horizontal"
         reverse_sorting = order == "backward"
         sort_by = sort_by[0].upper()
         span_limit = span_limit if span_limit > 0 else None
 
-        tensor_img = image.numpy()[0]
-        tensor_mask = mask.numpy()[0]
-        sorted_image = pixel_sort(tensor_img, tensor_mask, horizontal_sort, span_limit, sort_by, reverse_sorting)
-        tensor = torch.from_numpy(sorted_image).unsqueeze(0)
-        return (tensor,)
+        batch_size = image.shape[0]
+        result = torch.zeros_like(image)
+
+        for b in range(batch_size):
+            tensor_img = image[b].numpy()
+            tensor_mask = mask[b].numpy()
+            sorted_image = pixel_sort(tensor_img, tensor_mask, horizontal_sort, span_limit, sort_by, reverse_sorting)
+            result[b] = torch.from_numpy(sorted_image)
+
+        return (result,)
 
 NODE_CLASS_MAPPINGS = {
     "PixelSort": PixelSort,
