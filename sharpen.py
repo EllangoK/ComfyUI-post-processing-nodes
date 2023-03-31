@@ -1,6 +1,5 @@
-import cv2
-import numpy as np
 import torch
+import torch.nn.functional as F
 
 
 class Sharpen:
@@ -33,21 +32,21 @@ class Sharpen:
     CATEGORY = "postprocessing"
 
     def sharpen(self, image: torch.Tensor, kernel_size: int, alpha: float):
-        batch_size, height, width, _ = image.shape
+        batch_size, height, width, channels = image.shape
         result = torch.zeros_like(image)
 
+        kernel = torch.ones((channels, 1, kernel_size, kernel_size), dtype=torch.float32) * -1
+        center = kernel_size // 2
+        kernel[:, 0, center, center] = kernel_size**2
+        kernel *= alpha
+
         for b in range(batch_size):
-            tensor_image = image[b].numpy()
+            tensor_image = image[b].permute(2, 0, 1).unsqueeze(0)
 
-            kernel = np.ones((kernel_size, kernel_size), dtype=np.float32) * -1
-            center = kernel_size // 2
-            kernel[center, center] = kernel_size**2
-            kernel *= alpha
+            sharpened = F.conv2d(tensor_image, kernel, padding=center, groups=channels)
+            sharpened = sharpened.squeeze(0).permute(1, 2, 0)
 
-            sharpened = cv2.filter2D(tensor_image, -1, kernel)
-
-            tensor = torch.from_numpy(sharpened).unsqueeze(0)
-            tensor = torch.clamp(tensor, 0, 1)
+            tensor = torch.clamp(sharpened, 0, 1)
             result[b] = tensor
 
         return (result,)
