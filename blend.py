@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 
 class Blend:
@@ -27,21 +26,10 @@ class Blend:
     CATEGORY = "postprocessing"
 
     def blend_images(self, image1: torch.Tensor, image2: torch.Tensor, blend_factor: float, blend_mode: str):
-        batch_size, height, width, _ = image1.shape
-        result = torch.zeros_like(image1)
-
-        for b in range(batch_size):
-            img1 = image1[b].numpy()
-            img2 = image2[b].numpy()
-
-            blended_image = self.blend_mode(img1, img2, blend_mode)
-            blended_image = img1 * (1 - blend_factor) + blended_image * blend_factor
-            blended_image = np.clip(blended_image, 0, 1)
-
-            tensor = torch.from_numpy(blended_image).unsqueeze(0)
-            result[b] = tensor
-
-        return (result,)
+        blended_image = self.blend_mode(image1, image2, blend_mode)
+        blended_image = image1 * (1 - blend_factor) + blended_image * blend_factor
+        blended_image = torch.clamp(blended_image, 0, 1)
+        return (blended_image,)
 
     def blend_mode(self, img1, img2, mode):
         if mode == "normal":
@@ -51,14 +39,14 @@ class Blend:
         elif mode == "screen":
             return 1 - (1 - img1) * (1 - img2)
         elif mode == "overlay":
-            return np.where(img1 <= 0.5, 2 * img1 * img2, 1 - 2 * (1 - img1) * (1 - img2))
+            return torch.where(img1 <= 0.5, 2 * img1 * img2, 1 - 2 * (1 - img1) * (1 - img2))
         elif mode == "soft_light":
-            return np.where(img2 <= 0.5, img1 - (1 - 2 * img2) * img1 * (1 - img1), img1 + (2 * img2 - 1) * (self.g(img1) - img1))
+            return torch.where(img2 <= 0.5, img1 - (1 - 2 * img2) * img1 * (1 - img1), img1 + (2 * img2 - 1) * (self.g(img1) - img1))
         else:
             raise ValueError(f"Unsupported blend mode: {mode}")
 
     def g(self, x):
-        return np.where(x <= 0.25, ((16 * x - 12) * x + 4) * x, np.sqrt(x))
+        return torch.where(x <= 0.25, ((16 * x - 12) * x + 4) * x, torch.sqrt(x))
 
 NODE_CLASS_MAPPINGS = {
     "Blend": Blend,
