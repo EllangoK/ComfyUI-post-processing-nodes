@@ -9,6 +9,7 @@ A collection of post processing nodes for [ComfyUI](https://github.com/comfyanon
  - ColorCorrect: Adjusts the color balance, temperature, hue, brightness, contrast, saturation, and gamma of an image
  - Dither: Reduces the color information in an image by dithering, resulting in a patterned, pixelated appearance
  - FilmGrain: Adds a film grain effect to the image, along with options to control the temperature, and vignetting
+ - Glow: Applies a blur with a specified radius and then blends it with the original image. Creates a nice glowing effect.
  - GaussianBlur: Applies a Gaussian blur to the input image, softening the details
  - KMeansQuantize: Reduce the amount of colors in an image from 0-256
  - PixelSort: Rearranges the pixels in the input image based on their values, and input mask. Creates a cool glitch like effect.
