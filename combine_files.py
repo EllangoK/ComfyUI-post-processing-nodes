@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from pathlib import Path
 import sys
 import os
@@ -6,16 +7,17 @@ import ast
 import argparse
 
 
-def get_python_files(path):
-    for file in Path(path).glob("*.py"):
-        if file.is_file() and not file.name.startswith("combine"):
-            yield str(file)
+
+def get_python_files(path, recursive=False, args=None):
+    search_pattern = "**/*.py" if recursive else "*.py"
+    files = sorted([str(file) for file in Path(path).glob(search_pattern) if file.is_file() and not file.name.startswith("combine") and not args.output in str(file)])
+    yield from files
 
 def parse_files(files):
-    imports = set()
-    class_definitions = set()
-    node_class_mappings = set()
-    functions = set()
+    imports = OrderedDict()
+    class_definitions = OrderedDict()
+    node_class_mappings = OrderedDict()
+    functions = OrderedDict()
 
     for file in files:
         # read file as lines
@@ -30,7 +32,7 @@ def parse_files(files):
         while i < num_lines:
             line = lines[i]
             if line.startswith("import") or line.startswith("from"):
-                imports.add(line.strip())
+                imports[line.strip()] = None
 
             elif line.startswith("class"):
                 class_info = line
@@ -38,11 +40,11 @@ def parse_files(files):
                 while not lines[j].startswith("NODE_CLASS_MAPPINGS"):
                     class_info += lines[j]
                     j += 1
-                class_definitions.add(class_info)
+                class_definitions[class_info] = None
                 i = j - 1
 
             elif line.startswith("NODE_CLASS_MAPPINGS"):
-                node_class_mappings.add(lines[i+1])
+                node_class_mappings[lines[i+1]] = None
 
             elif line.startswith("def"):
                 function_info = line
@@ -50,7 +52,7 @@ def parse_files(files):
                 while j < num_lines and not lines[j].startswith("NODE_CLASS_MAPPINGS") and not lines[j].startswith("def"):
                     function_info += lines[j]
                     j += 1
-                functions.add(function_info)
+                functions[function_info] = None
                 i = j - 1
 
             i += 1
@@ -91,12 +93,19 @@ def main():
     parser = argparse.ArgumentParser(description="Collect unique imports from Python files")
     parser.add_argument("--all", action="store_true", help="Include all Python files in the specified directory")
     parser.add_argument("--files", nargs="+", help="Specify Python files to parse")
-    parser.add_argument("--output", default="combined_nodes.py", help="Specify the output file name")
+    parser.add_argument("--folder", default=".", help="Specify a folder to search for files")
+    parser.add_argument("--output", default="post_processing_nodes.py", help="Specify the output file name")
     args = parser.parse_args()
 
+    args.all = True
+
     if args.all:
-        args.path = "."
-        files = get_python_files(args.path)
+        args.folder = "." if args.folder is None else args.folder
+        files = get_python_files(args.folder, recursive=True, args=args)
+        imports, class_definitions, node_class_mappings, functions = parse_files(files)
+        write_combined(imports, class_definitions, node_class_mappings, functions, args.output)
+    elif args.folder is not None:
+        files = get_python_files(args.folder, recursive=True, args=args)
         imports, class_definitions, node_class_mappings, functions = parse_files(files)
         write_combined(imports, class_definitions, node_class_mappings, functions, args.output)
     else:

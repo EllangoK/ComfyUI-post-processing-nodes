@@ -1,9 +1,57 @@
-import numpy as np
 import torch
 import cv2
-import torch.nn.functional as F
+import numpy as np
 from PIL import Image, ImageEnhance
+import torch.nn.functional as F
 
+
+class Blend:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image1": ("IMAGE",),
+                "image2": ("IMAGE",),
+                "blend_factor": ("FLOAT", {
+                    "default": 0.5,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.01
+                }),
+                "blend_mode": (["normal", "multiply", "screen", "overlay", "soft_light"],),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "blend_images"
+
+    CATEGORY = "postprocessing"
+
+    def blend_images(self, image1: torch.Tensor, image2: torch.Tensor, blend_factor: float, blend_mode: str):
+        blended_image = self.blend_mode(image1, image2, blend_mode)
+        blended_image = image1 * (1 - blend_factor) + blended_image * blend_factor
+        blended_image = torch.clamp(blended_image, 0, 1)
+        return (blended_image,)
+
+    def blend_mode(self, img1, img2, mode):
+        if mode == "normal":
+            return img2
+        elif mode == "multiply":
+            return img1 * img2
+        elif mode == "screen":
+            return 1 - (1 - img1) * (1 - img2)
+        elif mode == "overlay":
+            return torch.where(img1 <= 0.5, 2 * img1 * img2, 1 - 2 * (1 - img1) * (1 - img2))
+        elif mode == "soft_light":
+            return torch.where(img2 <= 0.5, img1 - (1 - 2 * img2) * img1 * (1 - img1), img1 + (2 * img2 - 1) * (self.g(img1) - img1))
+        else:
+            raise ValueError(f"Unsupported blend mode: {mode}")
+
+    def g(self, x):
+        return torch.where(x <= 0.25, ((16 * x - 12) * x + 4) * x, torch.sqrt(x))
 
 class CannyEdgeDetection:
     def __init__(self):
@@ -46,6 +94,112 @@ class CannyEdgeDetection:
             result[b] = tensor
 
         return (result,)
+
+class ColorCorrect:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "temperature": ("FLOAT", {
+                    "default": 0,
+                    "min": -100,
+                    "max": 100,
+                    "step": 5
+                }),
+                "hue": ("FLOAT", {
+                    "default": 0,
+                    "min": -90,
+                    "max": 90,
+                    "step": 5
+                }),
+                "brightness": ("FLOAT", {
+                    "default": 0,
+                    "min": -100,
+                    "max": 100,
+                    "step": 5
+                }),
+                "contrast": ("FLOAT", {
+                    "default": 0,
+                    "min": -100,
+                    "max": 100,
+                    "step": 5
+                }),
+                "saturation": ("FLOAT", {
+                    "default": 0,
+                    "min": -100,
+                    "max": 100,
+                    "step": 5
+                }),
+                "gamma": ("FLOAT", {
+                    "default": 1,
+                    "min": 0.2,
+                    "max": 2.2,
+                    "step": 0.1
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "color_correct"
+
+    CATEGORY = "postprocessing"
+
+    def color_correct(self, image: torch.Tensor, temperature: float, hue: float, brightness: float, contrast: float, saturation: float, gamma: float):
+        batch_size, height, width, _ = image.shape
+        result = torch.zeros_like(image)
+
+        for b in range(batch_size):
+            tensor_image = image[b].numpy()
+
+            brightness /= 100
+            contrast /= 100
+            saturation /= 100
+            temperature /= 100
+
+            brightness = 1 + brightness
+            contrast = 1 + contrast
+            saturation = 1 + saturation
+
+            modified_image = Image.fromarray((tensor_image * 255).astype(np.uint8))
+
+            # brightness
+            modified_image = ImageEnhance.Brightness(modified_image).enhance(brightness)
+
+            # contrast
+            modified_image = ImageEnhance.Contrast(modified_image).enhance(contrast)
+            modified_image = np.array(modified_image).astype(np.float32)
+
+            # temperature
+            if temperature > 0:
+                modified_image[:, :, 0] *= 1 + temperature
+                modified_image[:, :, 1] *= 1 + temperature * 0.4
+            elif temperature < 0:
+                modified_image[:, :, 2] *= 1 - temperature
+            modified_image = np.clip(modified_image, 0, 255)/255
+
+            # gamma
+            modified_image = np.clip(np.power(modified_image, gamma), 0, 1)
+
+            # saturation
+            hls_img = cv2.cvtColor(modified_image, cv2.COLOR_RGB2HLS)
+            hls_img[:, :, 2] = np.clip(saturation*hls_img[:, :, 2], 0, 1)
+            modified_image = cv2.cvtColor(hls_img, cv2.COLOR_HLS2RGB) * 255
+
+            # hue
+            hsv_img = cv2.cvtColor(modified_image, cv2.COLOR_RGB2HSV)
+            hsv_img[:, :, 0] = (hsv_img[:, :, 0] + hue) % 360
+            modified_image = cv2.cvtColor(hsv_img, cv2.COLOR_HSV2RGB)
+
+            modified_image = modified_image.astype(np.uint8)
+            modified_image = modified_image / 255
+            modified_image = torch.from_numpy(modified_image).unsqueeze(0)
+            result[b] = modified_image
+
+        return (result, )
 
 class Dither:
     def __init__(self):
@@ -295,6 +449,62 @@ class GaussianBlur:
 
         return (blurred,)
 
+class KMeansQuantize:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "colors": ("INT", {
+                    "default": 16,
+                    "min": 1,
+                    "max": 256,
+                    "step": 1
+                }),
+                "precision": ("INT", {
+                    "default": 10,
+                    "min": 1,
+                    "max": 100,
+                    "step": 1
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "kmeans_quantize"
+
+    CATEGORY = "postprocessing"
+
+    def kmeans_quantize(self, image: torch.Tensor, colors: int, precision: int):
+        batch_size, height, width, _ = image.shape
+        result = torch.zeros_like(image)
+
+        for b in range(batch_size):
+            tensor_image = image[b].numpy().astype(np.float32)
+            img = tensor_image
+
+            height, width, c = img.shape
+
+            criteria = (
+                cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
+                precision * 5, 0.01
+            )
+
+            img_copy = img.reshape(-1, c)
+            _, label, center = cv2.kmeans(
+                img_copy, colors, None,
+                criteria, 1, cv2.KMEANS_PP_CENTERS
+            )
+
+            img = center[label.flatten()].reshape(*img.shape)
+            tensor = torch.from_numpy(img).unsqueeze(0)
+            result[b] = tensor
+
+        return (result,)
+
 class PixelSort:
     def __init__(self):
         pass
@@ -385,215 +595,36 @@ class Sharpen:
 
         return (result,)
 
-class ColorCorrect:
-    def __init__(self):
-        pass
+def sort_span(span, sort_by, reverse_sorting):
+    if sort_by == 'H':
+        key = lambda x: x[1][0]
+    elif sort_by == 'S':
+        key = lambda x: x[1][1]
+    else:
+        key = lambda x: x[1][2]
 
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "temperature": ("FLOAT", {
-                    "default": 0,
-                    "min": -100,
-                    "max": 100,
-                    "step": 5
-                }),
-                "hue": ("FLOAT", {
-                    "default": 0,
-                    "min": -90,
-                    "max": 90,
-                    "step": 5
-                }),
-                "brightness": ("FLOAT", {
-                    "default": 0,
-                    "min": -100,
-                    "max": 100,
-                    "step": 5
-                }),
-                "contrast": ("FLOAT", {
-                    "default": 0,
-                    "min": -100,
-                    "max": 100,
-                    "step": 5
-                }),
-                "saturation": ("FLOAT", {
-                    "default": 0,
-                    "min": -100,
-                    "max": 100,
-                    "step": 5
-                }),
-                "gamma": ("FLOAT", {
-                    "default": 1,
-                    "min": 0.2,
-                    "max": 2.2,
-                    "step": 0.1
-                }),
-            },
-        }
+    span = sorted(span, key=key, reverse=reverse_sorting)
+    return [x[0] for x in span]
 
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "color_correct"
 
-    CATEGORY = "postprocessing"
+def find_spans(mask, span_limit=None):
+    spans = []
+    start = None
+    for i, value in enumerate(mask):
+        if value == 0 and start is None:
+            start = i
+        if value == 1 and start is not None:
+            span_length = i - start
+            if span_limit is None or span_length <= span_limit:
+                spans.append((start, i))
+            start = None
+    if start is not None:
+        span_length = len(mask) - start
+        if span_limit is None or span_length <= span_limit:
+            spans.append((start, len(mask)))
 
-    def color_correct(self, image: torch.Tensor, temperature: float, hue: float, brightness: float, contrast: float, saturation: float, gamma: float):
-        batch_size, height, width, _ = image.shape
-        result = torch.zeros_like(image)
+    return spans
 
-        for b in range(batch_size):
-            tensor_image = image[b].numpy()
-
-            brightness /= 100
-            contrast /= 100
-            saturation /= 100
-            temperature /= 100
-
-            brightness = 1 + brightness
-            contrast = 1 + contrast
-            saturation = 1 + saturation
-
-            modified_image = Image.fromarray((tensor_image * 255).astype(np.uint8))
-
-            # brightness
-            modified_image = ImageEnhance.Brightness(modified_image).enhance(brightness)
-
-            # contrast
-            modified_image = ImageEnhance.Contrast(modified_image).enhance(contrast)
-            modified_image = np.array(modified_image).astype(np.float32)
-
-            # temperature
-            if temperature > 0:
-                modified_image[:, :, 0] *= 1 + temperature
-                modified_image[:, :, 1] *= 1 + temperature * 0.4
-            elif temperature < 0:
-                modified_image[:, :, 2] *= 1 - temperature
-            modified_image = np.clip(modified_image, 0, 255)/255
-
-            # gamma
-            modified_image = np.clip(np.power(modified_image, gamma), 0, 1)
-
-            # saturation
-            hls_img = cv2.cvtColor(modified_image, cv2.COLOR_RGB2HLS)
-            hls_img[:, :, 2] = np.clip(saturation*hls_img[:, :, 2], 0, 1)
-            modified_image = cv2.cvtColor(hls_img, cv2.COLOR_HLS2RGB) * 255
-
-            # hue
-            hsv_img = cv2.cvtColor(modified_image, cv2.COLOR_RGB2HSV)
-            hsv_img[:, :, 0] = (hsv_img[:, :, 0] + hue) % 360
-            modified_image = cv2.cvtColor(hsv_img, cv2.COLOR_HSV2RGB)
-
-            modified_image = modified_image.astype(np.uint8)
-            modified_image = modified_image / 255
-            modified_image = torch.from_numpy(modified_image).unsqueeze(0)
-            result[b] = modified_image
-
-        return (result, )
-
-class KMeansQuantize:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "colors": ("INT", {
-                    "default": 16,
-                    "min": 1,
-                    "max": 256,
-                    "step": 1
-                }),
-                "precision": ("INT", {
-                    "default": 10,
-                    "min": 1,
-                    "max": 100,
-                    "step": 1
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "kmeans_quantize"
-
-    CATEGORY = "postprocessing"
-
-    def kmeans_quantize(self, image: torch.Tensor, colors: int, precision: int):
-        batch_size, height, width, _ = image.shape
-        result = torch.zeros_like(image)
-
-        for b in range(batch_size):
-            tensor_image = image[b].numpy().astype(np.float32)
-            img = tensor_image
-
-            height, width, c = img.shape
-
-            criteria = (
-                cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
-                precision * 5, 0.01
-            )
-
-            img_copy = img.reshape(-1, c)
-            _, label, center = cv2.kmeans(
-                img_copy, colors, None,
-                criteria, 1, cv2.KMEANS_PP_CENTERS
-            )
-
-            img = center[label.flatten()].reshape(*img.shape)
-            tensor = torch.from_numpy(img).unsqueeze(0)
-            result[b] = tensor
-
-        return (result,)
-
-class Blend:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image1": ("IMAGE",),
-                "image2": ("IMAGE",),
-                "blend_factor": ("FLOAT", {
-                    "default": 0.5,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 0.01
-                }),
-                "blend_mode": (["normal", "multiply", "screen", "overlay", "soft_light"],),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "blend_images"
-
-    CATEGORY = "postprocessing"
-
-    def blend_images(self, image1: torch.Tensor, image2: torch.Tensor, blend_factor: float, blend_mode: str):
-        blended_image = self.blend_mode(image1, image2, blend_mode)
-        blended_image = image1 * (1 - blend_factor) + blended_image * blend_factor
-        blended_image = torch.clamp(blended_image, 0, 1)
-        return (blended_image,)
-
-    def blend_mode(self, img1, img2, mode):
-        if mode == "normal":
-            return img2
-        elif mode == "multiply":
-            return img1 * img2
-        elif mode == "screen":
-            return 1 - (1 - img1) * (1 - img2)
-        elif mode == "overlay":
-            return torch.where(img1 <= 0.5, 2 * img1 * img2, 1 - 2 * (1 - img1) * (1 - img2))
-        elif mode == "soft_light":
-            return torch.where(img2 <= 0.5, img1 - (1 - 2 * img2) * img1 * (1 - img1), img1 + (2 * img2 - 1) * (self.g(img1) - img1))
-        else:
-            raise ValueError(f"Unsupported blend mode: {mode}")
-
-    def g(self, x):
-        return torch.where(x <= 0.25, ((16 * x - 12) * x + 4) * x, torch.sqrt(x))
 
 def pixel_sort(img, mask, horizontal_sort=False, span_limit=None, sort_by='H', reverse_sorting=False):
     height, width, _ = img.shape
@@ -655,45 +686,14 @@ def pixel_sort(img, mask, horizontal_sort=False, span_limit=None, sort_by='H', r
 
     return sorted_image
 
-def sort_span(span, sort_by, reverse_sorting):
-    if sort_by == 'H':
-        key = lambda x: x[1][0]
-    elif sort_by == 'S':
-        key = lambda x: x[1][1]
-    else:
-        key = lambda x: x[1][2]
-
-    span = sorted(span, key=key, reverse=reverse_sorting)
-    return [x[0] for x in span]
-
-
-def find_spans(mask, span_limit=None):
-    spans = []
-    start = None
-    for i, value in enumerate(mask):
-        if value == 0 and start is None:
-            start = i
-        if value == 1 and start is not None:
-            span_length = i - start
-            if span_limit is None or span_length <= span_limit:
-                spans.append((start, i))
-            start = None
-    if start is not None:
-        span_length = len(mask) - start
-        if span_limit is None or span_length <= span_limit:
-            spans.append((start, len(mask)))
-
-    return spans
-
-
 NODE_CLASS_MAPPINGS = {
     "Blend": Blend,
-    "GaussianBlur": GaussianBlur,
-    "PixelSort": PixelSort,
-    "FilmGrain": FilmGrain,
-    "ColorCorrect": ColorCorrect,
-    "Sharpen": Sharpen,
     "CannyEdgeDetection": CannyEdgeDetection,
-    "KMeansQuantize": KMeansQuantize,
+    "ColorCorrect": ColorCorrect,
     "Dither": Dither,
+    "FilmGrain": FilmGrain,
+    "GaussianBlur": GaussianBlur,
+    "KMeansQuantize": KMeansQuantize,
+    "PixelSort": PixelSort,
+    "Sharpen": Sharpen,
 }
