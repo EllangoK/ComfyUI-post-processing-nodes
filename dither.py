@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 
 
@@ -30,7 +29,7 @@ class Dither:
         result = torch.zeros_like(image)
 
         for b in range(batch_size):
-            tensor_image = image[b].numpy()
+            tensor_image = image[b]
             img = (tensor_image * 255)
             height, width, _ = img.shape
 
@@ -38,8 +37,8 @@ class Dither:
 
             for y in range(height):
                 for x in range(width):
-                    old_pixel = img[y, x].copy()
-                    new_pixel = np.round(old_pixel / scale) * scale
+                    old_pixel = img[y, x].clone()
+                    new_pixel = torch.round(old_pixel / scale) * scale
                     img[y, x] = new_pixel
 
                     quant_error = old_pixel - new_pixel
@@ -54,7 +53,7 @@ class Dither:
                             img[y + 1, x + 1] += quant_error * 1 / 16
 
             dithered = img / 255
-            tensor = torch.from_numpy(dithered).unsqueeze(0)
+            tensor = dithered.unsqueeze(0)
             result[b] = tensor
 
         return (result,)

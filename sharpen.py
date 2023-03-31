@@ -33,21 +33,18 @@ class Sharpen:
 
     def sharpen(self, image: torch.Tensor, kernel_size: int, alpha: float):
         batch_size, height, width, channels = image.shape
-        result = torch.zeros_like(image)
 
-        kernel = torch.ones((channels, 1, kernel_size, kernel_size), dtype=torch.float32) * -1
+        kernel = torch.ones((kernel_size, kernel_size), dtype=torch.float32) * -1
         center = kernel_size // 2
-        kernel[:, 0, center, center] = kernel_size**2
+        kernel[center, center] = kernel_size**2
         kernel *= alpha
+        kernel = kernel.repeat(channels, 1, 1).unsqueeze(1)
 
-        for b in range(batch_size):
-            tensor_image = image[b].permute(2, 0, 1).unsqueeze(0)
+        tensor_image = image.permute(0, 3, 1, 2) # Torch wants (B, C, H, W) we use (B, H, W, C)
+        sharpened = F.conv2d(tensor_image, kernel, padding=center, groups=channels)
+        sharpened = sharpened.permute(0, 2, 3, 1)
 
-            sharpened = F.conv2d(tensor_image, kernel, padding=center, groups=channels)
-            sharpened = sharpened.squeeze(0).permute(1, 2, 0)
-
-            tensor = torch.clamp(sharpened, 0, 1)
-            result[b] = tensor
+        result = torch.clamp(sharpened, 0, 1)
 
         return (result,)
 

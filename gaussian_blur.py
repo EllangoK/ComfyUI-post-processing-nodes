@@ -1,6 +1,5 @@
-import cv2
 import torch
-
+import torch.nn.functional as F
 
 class GaussianBlur:
     def __init__(self):
@@ -31,17 +30,22 @@ class GaussianBlur:
 
     CATEGORY = "postprocessing"
 
+    def gaussian_kernel(self, kernel_size: int, sigma: float):
+        x, y = torch.meshgrid(torch.linspace(-1, 1, kernel_size), torch.linspace(-1, 1, kernel_size))
+        d = torch.sqrt(x * x + y * y)
+        g = torch.exp(-(d * d) / (2.0 * sigma * sigma))
+        return g / g.sum()
+
     def blur(self, image: torch.Tensor, kernel_size: int, sigma: float):
-        batch_size, height, width, _ = image.shape
-        result = torch.zeros_like(image)
+        batch_size, height, width, channels = image.shape
 
-        for b in range(batch_size):
-            tensor_image = image[b].numpy()
-            blurred = cv2.GaussianBlur(tensor_image, (kernel_size, kernel_size), sigma)
-            tensor = torch.from_numpy(blurred).unsqueeze(0)
-            result[b] = tensor
+        kernel = self.gaussian_kernel(kernel_size, sigma).repeat(channels, 1, 1).unsqueeze(1)
 
-        return (result,)
+        image = image.permute(0, 3, 1, 2) # Torch wants (B, C, H, W) we use (B, H, W, C)
+        blurred = F.conv2d(image, kernel, padding=kernel_size // 2, groups=channels)
+        blurred = blurred.permute(0, 2, 3, 1)
+
+        return (blurred,)
 
 NODE_CLASS_MAPPINGS = {
     "GaussianBlur": GaussianBlur

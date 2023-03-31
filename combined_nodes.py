@@ -1,8 +1,51 @@
-from PIL import Image, ImageEnhance
 import numpy as np
 import torch
 import cv2
+import torch.nn.functional as F
+from PIL import Image, ImageEnhance
 
+
+class CannyEdgeDetection:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "lower_threshold": ("INT", {
+                    "default": 100,
+                    "min": 0,
+                    "max": 500,
+                    "step": 10
+                }),
+                "upper_threshold": ("INT", {
+                    "default": 200,
+                    "min": 0,
+                    "max": 500,
+                    "step": 10
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "canny"
+
+    CATEGORY = "postprocessing"
+
+    def canny(self, image: torch.Tensor, lower_threshold: int, upper_threshold: int):
+        batch_size, height, width, _ = image.shape
+        result = torch.zeros(batch_size, height, width)
+
+        for b in range(batch_size):
+            tensor_image = image[b].numpy().copy()
+            gray_image = (cv2.cvtColor(tensor_image, cv2.COLOR_RGB2GRAY) * 255).astype(np.uint8)
+            canny = cv2.Canny(gray_image, lower_threshold, upper_threshold)
+            tensor = torch.from_numpy(canny)
+            result[b] = tensor
+
+        return (result,)
 
 class Dither:
     def __init__(self):
@@ -32,7 +75,7 @@ class Dither:
         result = torch.zeros_like(image)
 
         for b in range(batch_size):
-            tensor_image = image[b].numpy()
+            tensor_image = image[b]
             img = (tensor_image * 255)
             height, width, _ = img.shape
 
@@ -40,8 +83,8 @@ class Dither:
 
             for y in range(height):
                 for x in range(width):
-                    old_pixel = img[y, x].copy()
-                    new_pixel = np.round(old_pixel / scale) * scale
+                    old_pixel = img[y, x].clone()
+                    new_pixel = torch.round(old_pixel / scale) * scale
                     img[y, x] = new_pixel
 
                     quant_error = old_pixel - new_pixel
@@ -56,48 +99,7 @@ class Dither:
                             img[y + 1, x + 1] += quant_error * 1 / 16
 
             dithered = img / 255
-            tensor = torch.from_numpy(dithered).unsqueeze(0)
-            result[b] = tensor
-
-        return (result,)
-
-class GaussianBlur:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "kernel_size": ("INT", {
-                    "default": 5,
-                    "min": 1,
-                    "max": 31,
-                    "step": 1
-                }),
-                "sigma": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.1,
-                    "max": 10.0,
-                    "step": 0.1
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "blur"
-
-    CATEGORY = "postprocessing"
-
-    def blur(self, image: torch.Tensor, kernel_size: int, sigma: float):
-        batch_size, height, width, _ = image.shape
-        result = torch.zeros_like(image)
-
-        for b in range(batch_size):
-            tensor_image = image[b].numpy()
-            blurred = cv2.GaussianBlur(tensor_image, (kernel_size, kernel_size), sigma)
-            tensor = torch.from_numpy(blurred).unsqueeze(0)
+            tensor = dithered.unsqueeze(0)
             result[b] = tensor
 
         return (result,)
@@ -247,164 +249,7 @@ class FilmGrain:
 
         return np.clip(image * vignette[..., np.newaxis], 0, 1)
 
-class KMeansQuantize:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "colors": ("INT", {
-                    "default": 16,
-                    "min": 1,
-                    "max": 256,
-                    "step": 1
-                }),
-                "precision": ("INT", {
-                    "default": 10,
-                    "min": 1,
-                    "max": 100,
-                    "step": 1
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "kmeans_quantize"
-
-    CATEGORY = "postprocessing"
-
-    def kmeans_quantize(self, image: torch.Tensor, colors: int, precision: int):
-        batch_size, height, width, _ = image.shape
-        result = torch.zeros_like(image)
-
-        for b in range(batch_size):
-            tensor_image = image[b].numpy().astype(np.float32)
-            img = tensor_image
-
-            height, width, c = img.shape
-
-            criteria = (
-                cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
-                precision * 5, 0.01
-            )
-
-            img_copy = img.reshape(-1, c)
-            _, label, center = cv2.kmeans(
-                img_copy, colors, None,
-                criteria, 1, cv2.KMEANS_PP_CENTERS
-            )
-
-            img = center[label.flatten()].reshape(*img.shape)
-            tensor = torch.from_numpy(img).unsqueeze(0)
-            result[b] = tensor
-
-        return (result,)
-
-class Blend:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image1": ("IMAGE",),
-                "image2": ("IMAGE",),
-                "blend_factor": ("FLOAT", {
-                    "default": 0.5,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 0.01
-                }),
-                "blend_mode": (["normal", "multiply", "screen", "overlay", "soft_light"],),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "blend_images"
-
-    CATEGORY = "postprocessing"
-
-    def blend_images(self, image1: torch.Tensor, image2: torch.Tensor, blend_factor: float, blend_mode: str):
-        batch_size, height, width, _ = image1.shape
-        result = torch.zeros_like(image1)
-
-        for b in range(batch_size):
-            img1 = image1[b].numpy()
-            img2 = image2[b].numpy()
-
-            blended_image = self.blend_mode(img1, img2, blend_mode)
-            blended_image = img1 * (1 - blend_factor) + blended_image * blend_factor
-            blended_image = np.clip(blended_image, 0, 1)
-
-            tensor = torch.from_numpy(blended_image).unsqueeze(0)
-            result[b] = tensor
-
-        return (result,)
-
-    def blend_mode(self, img1, img2, mode):
-        if mode == "normal":
-            return img2
-        elif mode == "multiply":
-            return img1 * img2
-        elif mode == "screen":
-            return 1 - (1 - img1) * (1 - img2)
-        elif mode == "overlay":
-            return np.where(img1 <= 0.5, 2 * img1 * img2, 1 - 2 * (1 - img1) * (1 - img2))
-        elif mode == "soft_light":
-            return np.where(img2 <= 0.5, img1 - (1 - 2 * img2) * img1 * (1 - img1), img1 + (2 * img2 - 1) * (self.g(img1) - img1))
-        else:
-            raise ValueError(f"Unsupported blend mode: {mode}")
-
-    def g(self, x):
-        return np.where(x <= 0.25, ((16 * x - 12) * x + 4) * x, np.sqrt(x))
-
-class CannyEdgeDetection:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "lower_threshold": ("INT", {
-                    "default": 100,
-                    "min": 0,
-                    "max": 500,
-                    "step": 10
-                }),
-                "upper_threshold": ("INT", {
-                    "default": 200,
-                    "min": 0,
-                    "max": 500,
-                    "step": 10
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "canny"
-
-    CATEGORY = "postprocessing"
-
-    def canny(self, image: torch.Tensor, lower_threshold: int, upper_threshold: int):
-        batch_size, height, width, _ = image.shape
-        result = torch.zeros(batch_size, height, width)
-
-        for b in range(batch_size):
-            tensor_image = image[b].numpy().copy()
-            gray_image = (cv2.cvtColor(tensor_image, cv2.COLOR_RGB2GRAY) * 255).astype(np.uint8)
-            canny = cv2.Canny(gray_image, lower_threshold, upper_threshold)
-            tensor = torch.from_numpy(canny)
-            result[b] = tensor
-
-        return (result,)
-
-class Sharpen:
+class GaussianBlur:
     def __init__(self):
         pass
 
@@ -419,39 +264,36 @@ class Sharpen:
                     "max": 31,
                     "step": 1
                 }),
-                "alpha": ("FLOAT", {
+                "sigma": ("FLOAT", {
                     "default": 1.0,
                     "min": 0.1,
-                    "max": 5.0,
+                    "max": 10.0,
                     "step": 0.1
                 }),
             },
         }
 
     RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "sharpen"
+    FUNCTION = "blur"
 
     CATEGORY = "postprocessing"
 
-    def sharpen(self, image: torch.Tensor, kernel_size: int, alpha: float):
-        batch_size, height, width, _ = image.shape
-        result = torch.zeros_like(image)
+    def gaussian_kernel(self, kernel_size: int, sigma: float):
+        x, y = torch.meshgrid(torch.linspace(-1, 1, kernel_size), torch.linspace(-1, 1, kernel_size))
+        d = torch.sqrt(x * x + y * y)
+        g = torch.exp(-(d * d) / (2.0 * sigma * sigma))
+        return g / g.sum()
 
-        for b in range(batch_size):
-            tensor_image = image[b].numpy()
+    def blur(self, image: torch.Tensor, kernel_size: int, sigma: float):
+        batch_size, height, width, channels = image.shape
 
-            kernel = np.ones((kernel_size, kernel_size), dtype=np.float32) * -1
-            center = kernel_size // 2
-            kernel[center, center] = kernel_size**2
-            kernel *= alpha
+        kernel = self.gaussian_kernel(kernel_size, sigma).repeat(channels, 1, 1).unsqueeze(1)
 
-            sharpened = cv2.filter2D(tensor_image, -1, kernel)
+        image = image.permute(0, 3, 1, 2) # Torch wants (B, C, H, W) we use (B, H, W, C)
+        blurred = F.conv2d(image, kernel, padding=kernel_size // 2, groups=channels)
+        blurred = blurred.permute(0, 2, 3, 1)
 
-            tensor = torch.from_numpy(sharpened).unsqueeze(0)
-            tensor = torch.clamp(tensor, 0, 1)
-            result[b] = tensor
-
-        return (result,)
+        return (blurred,)
 
 class PixelSort:
     def __init__(self):
@@ -494,6 +336,52 @@ class PixelSort:
             tensor_mask = mask[b].numpy()
             sorted_image = pixel_sort(tensor_img, tensor_mask, horizontal_sort, span_limit, sort_by, reverse_sorting)
             result[b] = torch.from_numpy(sorted_image)
+
+        return (result,)
+
+class Sharpen:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "kernel_size": ("INT", {
+                    "default": 5,
+                    "min": 1,
+                    "max": 31,
+                    "step": 1
+                }),
+                "alpha": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.1,
+                    "max": 5.0,
+                    "step": 0.1
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "sharpen"
+
+    CATEGORY = "postprocessing"
+
+    def sharpen(self, image: torch.Tensor, kernel_size: int, alpha: float):
+        batch_size, height, width, channels = image.shape
+
+        kernel = torch.ones((kernel_size, kernel_size), dtype=torch.float32) * -1
+        center = kernel_size // 2
+        kernel[center, center] = kernel_size**2
+        kernel *= alpha
+        kernel = kernel.repeat(channels, 1, 1).unsqueeze(1)
+
+        tensor_image = image.permute(0, 3, 1, 2) # Torch wants (B, C, H, W) we use (B, H, W, C)
+        sharpened = F.conv2d(tensor_image, kernel, padding=center, groups=channels)
+        sharpened = sharpened.permute(0, 2, 3, 1)
+
+        result = torch.clamp(sharpened, 0, 1)
 
         return (result,)
 
@@ -603,36 +491,109 @@ class ColorCorrect:
 
         return (result, )
 
-def sort_span(span, sort_by, reverse_sorting):
-    if sort_by == 'H':
-        key = lambda x: x[1][0]
-    elif sort_by == 'S':
-        key = lambda x: x[1][1]
-    else:
-        key = lambda x: x[1][2]
+class KMeansQuantize:
+    def __init__(self):
+        pass
 
-    span = sorted(span, key=key, reverse=reverse_sorting)
-    return [x[0] for x in span]
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "colors": ("INT", {
+                    "default": 16,
+                    "min": 1,
+                    "max": 256,
+                    "step": 1
+                }),
+                "precision": ("INT", {
+                    "default": 10,
+                    "min": 1,
+                    "max": 100,
+                    "step": 1
+                }),
+            },
+        }
 
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "kmeans_quantize"
 
-def find_spans(mask, span_limit=None):
-    spans = []
-    start = None
-    for i, value in enumerate(mask):
-        if value == 0 and start is None:
-            start = i
-        if value == 1 and start is not None:
-            span_length = i - start
-            if span_limit is None or span_length <= span_limit:
-                spans.append((start, i))
-            start = None
-    if start is not None:
-        span_length = len(mask) - start
-        if span_limit is None or span_length <= span_limit:
-            spans.append((start, len(mask)))
+    CATEGORY = "postprocessing"
 
-    return spans
+    def kmeans_quantize(self, image: torch.Tensor, colors: int, precision: int):
+        batch_size, height, width, _ = image.shape
+        result = torch.zeros_like(image)
 
+        for b in range(batch_size):
+            tensor_image = image[b].numpy().astype(np.float32)
+            img = tensor_image
+
+            height, width, c = img.shape
+
+            criteria = (
+                cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
+                precision * 5, 0.01
+            )
+
+            img_copy = img.reshape(-1, c)
+            _, label, center = cv2.kmeans(
+                img_copy, colors, None,
+                criteria, 1, cv2.KMEANS_PP_CENTERS
+            )
+
+            img = center[label.flatten()].reshape(*img.shape)
+            tensor = torch.from_numpy(img).unsqueeze(0)
+            result[b] = tensor
+
+        return (result,)
+
+class Blend:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image1": ("IMAGE",),
+                "image2": ("IMAGE",),
+                "blend_factor": ("FLOAT", {
+                    "default": 0.5,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.01
+                }),
+                "blend_mode": (["normal", "multiply", "screen", "overlay", "soft_light"],),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "blend_images"
+
+    CATEGORY = "postprocessing"
+
+    def blend_images(self, image1: torch.Tensor, image2: torch.Tensor, blend_factor: float, blend_mode: str):
+        blended_image = self.blend_mode(image1, image2, blend_mode)
+        blended_image = image1 * (1 - blend_factor) + blended_image * blend_factor
+        blended_image = torch.clamp(blended_image, 0, 1)
+        return (blended_image,)
+
+    def blend_mode(self, img1, img2, mode):
+        if mode == "normal":
+            return img2
+        elif mode == "multiply":
+            return img1 * img2
+        elif mode == "screen":
+            return 1 - (1 - img1) * (1 - img2)
+        elif mode == "overlay":
+            return torch.where(img1 <= 0.5, 2 * img1 * img2, 1 - 2 * (1 - img1) * (1 - img2))
+        elif mode == "soft_light":
+            return torch.where(img2 <= 0.5, img1 - (1 - 2 * img2) * img1 * (1 - img1), img1 + (2 * img2 - 1) * (self.g(img1) - img1))
+        else:
+            raise ValueError(f"Unsupported blend mode: {mode}")
+
+    def g(self, x):
+        return torch.where(x <= 0.25, ((16 * x - 12) * x + 4) * x, torch.sqrt(x))
 
 def pixel_sort(img, mask, horizontal_sort=False, span_limit=None, sort_by='H', reverse_sorting=False):
     height, width, _ = img.shape
@@ -694,14 +655,45 @@ def pixel_sort(img, mask, horizontal_sort=False, span_limit=None, sort_by='H', r
 
     return sorted_image
 
+def sort_span(span, sort_by, reverse_sorting):
+    if sort_by == 'H':
+        key = lambda x: x[1][0]
+    elif sort_by == 'S':
+        key = lambda x: x[1][1]
+    else:
+        key = lambda x: x[1][2]
+
+    span = sorted(span, key=key, reverse=reverse_sorting)
+    return [x[0] for x in span]
+
+
+def find_spans(mask, span_limit=None):
+    spans = []
+    start = None
+    for i, value in enumerate(mask):
+        if value == 0 and start is None:
+            start = i
+        if value == 1 and start is not None:
+            span_length = i - start
+            if span_limit is None or span_length <= span_limit:
+                spans.append((start, i))
+            start = None
+    if start is not None:
+        span_length = len(mask) - start
+        if span_limit is None or span_length <= span_limit:
+            spans.append((start, len(mask)))
+
+    return spans
+
+
 NODE_CLASS_MAPPINGS = {
+    "Blend": Blend,
+    "GaussianBlur": GaussianBlur,
+    "PixelSort": PixelSort,
     "FilmGrain": FilmGrain,
     "ColorCorrect": ColorCorrect,
+    "Sharpen": Sharpen,
+    "CannyEdgeDetection": CannyEdgeDetection,
     "KMeansQuantize": KMeansQuantize,
     "Dither": Dither,
-    "PixelSort": PixelSort,
-    "CannyEdgeDetection": CannyEdgeDetection,
-    "Sharpen": Sharpen,
-    "GaussianBlur": GaussianBlur,
-    "Blend": Blend,
 }
