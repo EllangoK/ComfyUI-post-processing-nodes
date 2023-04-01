@@ -61,17 +61,17 @@ class ColorCorrect:
         batch_size, height, width, _ = image.shape
         result = torch.zeros_like(image)
 
+        brightness /= 100
+        contrast /= 100
+        saturation /= 100
+        temperature /= 100
+
+        brightness = 1 + brightness
+        contrast = 1 + contrast
+        saturation = 1 + saturation
+
         for b in range(batch_size):
             tensor_image = image[b].numpy()
-
-            brightness /= 100
-            contrast /= 100
-            saturation /= 100
-            temperature /= 100
-
-            brightness = 1 + brightness
-            contrast = 1 + contrast
-            saturation = 1 + saturation
 
             modified_image = Image.fromarray((tensor_image * 255).astype(np.uint8))
 

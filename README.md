@@ -13,6 +13,7 @@ A collection of post processing nodes for [ComfyUI](https://github.com/comfyanon
  - GaussianBlur: Applies a Gaussian blur to the input image, softening the details
  - KMeansQuantize: Reduce the amount of colors in an image from 0-256
  - PixelSort: Rearranges the pixels in the input image based on their values, and input mask. Creates a cool glitch like effect.
+ - Pixelize: Applies a pixelization effect, simulating the reducing of resolution
  - Sharpen: Enhances the details in an image by applying a sharpening filter
 
 ## Example workflow
@@ -27,4 +28,6 @@ By default `post_processing_nodes.py` should have all of the combined nodes. If 
 
 or just run
 
-    python combine_files.py -h for more help
+    python combine_files.py -h
+
+ for more help
