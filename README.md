@@ -30,4 +30,4 @@ or just run
 
     python combine_files.py -h
 
- for more help
+for more help

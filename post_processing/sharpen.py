@@ -11,10 +11,10 @@ class Sharpen:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "kernel_size": ("INT", {
-                    "default": 5,
+                "sharpen_radius": ("INT", {
+                    "default": 1,
                     "min": 1,
-                    "max": 31,
+                    "max": 15,
                     "step": 1
                 }),
                 "alpha": ("FLOAT", {
@@ -31,9 +31,13 @@ class Sharpen:
 
     CATEGORY = "postprocessing"
 
-    def sharpen(self, image: torch.Tensor, kernel_size: int, alpha: float):
+    def sharpen(self, image: torch.Tensor, blur_radius: int, alpha: float):
+        if blur_radius == 0:
+            return (image,)
+
         batch_size, height, width, channels = image.shape
 
+        kernel_size = blur_radius * 2 + 1
         kernel = torch.ones((kernel_size, kernel_size), dtype=torch.float32) * -1
         center = kernel_size // 2
         kernel[center, center] = kernel_size**2

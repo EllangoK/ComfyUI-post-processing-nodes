@@ -412,10 +412,10 @@ class GaussianBlur:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "kernel_size": ("INT", {
-                    "default": 5,
+                "blur_radius": ("INT", {
+                    "default": 1,
                     "min": 1,
-                    "max": 31,
+                    "max": 15,
                     "step": 1
                 }),
                 "sigma": ("FLOAT", {
@@ -438,9 +438,13 @@ class GaussianBlur:
         g = torch.exp(-(d * d) / (2.0 * sigma * sigma))
         return g / g.sum()
 
-    def blur(self, image: torch.Tensor, kernel_size: int, sigma: float):
+    def blur(self, image: torch.Tensor, blur_radius: int, sigma: float):
+        if blur_radius == 0:
+            return (image,)
+
         batch_size, height, width, channels = image.shape
 
+        kernel_size = blur_radius * 2 + 1
         kernel = self.gaussian_kernel(kernel_size, sigma).repeat(channels, 1, 1).unsqueeze(1)
 
         image = image.permute(0, 3, 1, 2) # Torch wants (B, C, H, W) we use (B, H, W, C)
@@ -654,10 +658,10 @@ class Sharpen:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "kernel_size": ("INT", {
-                    "default": 5,
+                "sharpen_radius": ("INT", {
+                    "default": 1,
                     "min": 1,
-                    "max": 31,
+                    "max": 15,
                     "step": 1
                 }),
                 "alpha": ("FLOAT", {
@@ -674,9 +678,13 @@ class Sharpen:
 
     CATEGORY = "postprocessing"
 
-    def sharpen(self, image: torch.Tensor, kernel_size: int, alpha: float):
+    def sharpen(self, image: torch.Tensor, blur_radius: int, alpha: float):
+        if blur_radius == 0:
+            return (image,)
+
         batch_size, height, width, channels = image.shape
 
+        kernel_size = blur_radius * 2 + 1
         kernel = torch.ones((kernel_size, kernel_size), dtype=torch.float32) * -1
         center = kernel_size // 2
         kernel[center, center] = kernel_size**2
