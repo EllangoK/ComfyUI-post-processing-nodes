@@ -1,11 +1,11 @@
 import torch
+import torch.nn.functional as F
 import cv2
 import numpy as np
 from PIL import Image, ImageEnhance
-import torch.nn.functional as F
 
 
-class Blend:
+class ArithmeticBlend:
     def __init__(self):
         pass
 
@@ -15,43 +15,86 @@ class Blend:
             "required": {
                 "image1": ("IMAGE",),
                 "image2": ("IMAGE",),
-                "blend_factor": ("FLOAT", {
-                    "default": 0.5,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 0.01
-                }),
-                "blend_mode": (["normal", "multiply", "screen", "overlay", "soft_light"],),
+                "blend_mode": (["add", "subtract", "difference"],),
             },
         }
 
     RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "blend_images"
+    FUNCTION = "arithmetic_blend_images"
 
     CATEGORY = "postprocessing"
 
-    def blend_images(self, image1: torch.Tensor, image2: torch.Tensor, blend_factor: float, blend_mode: str):
-        blended_image = self.blend_mode(image1, image2, blend_mode)
-        blended_image = image1 * (1 - blend_factor) + blended_image * blend_factor
+    def arithmetic_blend_images(self, image1: torch.Tensor, image2: torch.Tensor, blend_mode: str):
+        if blend_mode == "add":
+            blended_image = self.add(image1, image2)
+        elif blend_mode == "subtract":
+            blended_image = self.subtract(image1, image2)
+        elif blend_mode == "difference":
+            blended_image = self.difference(image1, image2)
+        else:
+            raise ValueError(f"Unsupported arithmetic blend mode: {blend_mode}")
+
         blended_image = torch.clamp(blended_image, 0, 1)
         return (blended_image,)
 
-    def blend_mode(self, img1, img2, mode):
-        if mode == "normal":
-            return img2
-        elif mode == "multiply":
-            return img1 * img2
-        elif mode == "screen":
-            return 1 - (1 - img1) * (1 - img2)
-        elif mode == "overlay":
-            return torch.where(img1 <= 0.5, 2 * img1 * img2, 1 - 2 * (1 - img1) * (1 - img2))
-        elif mode == "soft_light":
-            return torch.where(img2 <= 0.5, img1 - (1 - 2 * img2) * img1 * (1 - img1), img1 + (2 * img2 - 1) * (self.g(img1) - img1))
-        else:
-            raise ValueError(f"Unsupported blend mode: {mode}")
+    def add(self, img1, img2):
+        return img1 + img2
 
-    def g(self, x):
-        return torch.where(x <= 0.25, ((16 * x - 12) * x + 4) * x, torch.sqrt(x))
+    def subtract(self, img1, img2):
+        return img1 - img2
+
+    def difference(self, img1, img2):
+        return torch.abs(img1 - img2)
+
+class Blur:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "blur_radius": ("INT", {
+                    "default": 1,
+                    "min": 1,
+                    "max": 15,
+                    "step": 1
+                }),
+                "sigma": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.1,
+                    "max": 10.0,
+                    "step": 0.1
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "blur"
+
+    CATEGORY = "postprocessing"
+
+    def gaussian_kernel(self, kernel_size: int, sigma: float):
+        x, y = torch.meshgrid(torch.linspace(-1, 1, kernel_size), torch.linspace(-1, 1, kernel_size))
+        d = torch.sqrt(x * x + y * y)
+        g = torch.exp(-(d * d) / (2.0 * sigma * sigma))
+        return g / g.sum()
+
+    def blur(self, image: torch.Tensor, blur_radius: int, sigma: float):
+        if blur_radius == 0:
+            return (image,)
+
+        batch_size, height, width, channels = image.shape
+
+        kernel_size = blur_radius * 2 + 1
+        kernel = self.gaussian_kernel(kernel_size, sigma).repeat(channels, 1, 1).unsqueeze(1)
+
+        image = image.permute(0, 3, 1, 2) # Torch wants (B, C, H, W) we use (B, H, W, C)
+        blurred = F.conv2d(image, kernel, padding=kernel_size // 2, groups=channels)
+        blurred = blurred.permute(0, 2, 3, 1)
+
+        return (blurred,)
 
 class CannyEdgeDetection:
     def __init__(self):
@@ -201,6 +244,38 @@ class ColorCorrect:
 
         return (result, )
 
+class Dissolve:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image1": ("IMAGE",),
+                "image2": ("IMAGE",),
+                "dissolve_factor": ("FLOAT", {
+                    "default": 0.5,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.01
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "dissolve_images"
+
+    CATEGORY = "postprocessing"
+
+    def dissolve_images(self, image1: torch.Tensor, image2: torch.Tensor, dissolve_factor: float):
+        dither_pattern = torch.rand_like(image1)
+        mask = (dither_pattern < dissolve_factor).float()
+
+        dissolved_image = image1 * mask + image2 * (1 - mask)
+        dissolved_image = torch.clamp(dissolved_image, 0, 1)
+        return (dissolved_image,)
+
 class Dither:
     def __init__(self):
         pass
@@ -257,6 +332,69 @@ class Dither:
             result[b] = tensor
 
         return (result,)
+
+class DodgeAndBurn:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "mask": ("IMAGE",),
+                "intensity": ("FLOAT", {
+                    "default": 0.5,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.01
+                }),
+                "mode": (["dodge", "burn", "dodge_and_burn", "burn_and_dodge", "color_dodge", "color_burn", "linear_dodge", "linear_burn"],),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "dodge_and_burn"
+
+    CATEGORY = "postprocessing"
+
+    def dodge_and_burn(self, image: torch.Tensor, mask: torch.Tensor, intensity: float, mode: str):
+        if mode in ["dodge", "color_dodge", "linear_dodge"]:
+            dodged_image = self.dodge(image, mask, intensity, mode)
+            return (dodged_image,)
+        elif mode in ["burn", "color_burn", "linear_burn"]:
+            burned_image = self.burn(image, mask, intensity, mode)
+            return (burned_image,)
+        elif mode == "dodge_and_burn":
+            dodged_image = self.dodge(image, mask, intensity, "dodge")
+            burned_image = self.burn(dodged_image, mask, intensity, "burn")
+            return (burned_image,)
+        elif mode == "burn_and_dodge":
+            burned_image = self.burn(image, mask, intensity, "burn")
+            dodged_image = self.dodge(burned_image, mask, intensity, "dodge")
+            return (dodged_image,)
+        else:
+            raise ValueError(f"Unsupported dodge and burn mode: {mode}")
+
+    def dodge(self, img, mask, intensity, mode):
+        if mode == "dodge":
+            return img / (1 - mask * intensity + 1e-7)
+        elif mode == "color_dodge":
+            return torch.where(mask < 1, img / (1 - mask * intensity), img)
+        elif mode == "linear_dodge":
+            return torch.clamp(img + mask * intensity, 0, 1)
+        else:
+            raise ValueError(f"Unsupported dodge mode: {mode}")
+
+    def burn(self, img, mask, intensity, mode):
+        if mode == "burn":
+            return 1 - (1 - img) / (mask * intensity + 1e-7)
+        elif mode == "color_burn":
+            return torch.where(mask > 0, 1 - (1 - img) / (mask * intensity), img)
+        elif mode == "linear_burn":
+            return torch.clamp(img - mask * intensity, 0, 1)
+        else:
+            raise ValueError(f"Unsupported burn mode: {mode}")
 
 class FilmGrain:
     def __init__(self):
@@ -402,56 +540,6 @@ class FilmGrain:
         vignette = 1 - np.clip(radius / mapped_vignette_strength, 0, 1)
 
         return np.clip(image * vignette[..., np.newaxis], 0, 1)
-
-class GaussianBlur:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "blur_radius": ("INT", {
-                    "default": 1,
-                    "min": 1,
-                    "max": 15,
-                    "step": 1
-                }),
-                "sigma": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.1,
-                    "max": 10.0,
-                    "step": 0.1
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "blur"
-
-    CATEGORY = "postprocessing"
-
-    def gaussian_kernel(self, kernel_size: int, sigma: float):
-        x, y = torch.meshgrid(torch.linspace(-1, 1, kernel_size), torch.linspace(-1, 1, kernel_size))
-        d = torch.sqrt(x * x + y * y)
-        g = torch.exp(-(d * d) / (2.0 * sigma * sigma))
-        return g / g.sum()
-
-    def blur(self, image: torch.Tensor, blur_radius: int, sigma: float):
-        if blur_radius == 0:
-            return (image,)
-
-        batch_size, height, width, channels = image.shape
-
-        kernel_size = blur_radius * 2 + 1
-        kernel = self.gaussian_kernel(kernel_size, sigma).repeat(channels, 1, 1).unsqueeze(1)
-
-        image = image.permute(0, 3, 1, 2) # Torch wants (B, C, H, W) we use (B, H, W, C)
-        blurred = F.conv2d(image, kernel, padding=kernel_size // 2, groups=channels)
-        blurred = blurred.permute(0, 2, 3, 1)
-
-        return (blurred,)
 
 class Glow:
     def __init__(self):
@@ -791,12 +879,14 @@ def pixel_sort(img, mask, horizontal_sort=False, span_limit=None, sort_by='H', r
     return sorted_image
 
 NODE_CLASS_MAPPINGS = {
-    "Blend": Blend,
+    "ArithmeticBlend": ArithmeticBlend,
+    "Blur": Blur,
     "CannyEdgeDetection": CannyEdgeDetection,
     "ColorCorrect": ColorCorrect,
+    "Dissolve": Dissolve,
     "Dither": Dither,
+    "DodgeAndBurn": DodgeAndBurn,
     "FilmGrain": FilmGrain,
-    "GaussianBlur": GaussianBlur,
     "Glow": Glow,
     "KMeansQuantize": KMeansQuantize,
     "PixelSort": PixelSort,

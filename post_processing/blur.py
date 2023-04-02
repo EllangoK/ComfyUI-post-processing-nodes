@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-class GaussianBlur:
+class Blur:
     def __init__(self):
         pass
 
@@ -52,5 +52,5 @@ class GaussianBlur:
         return (blurred,)
 
 NODE_CLASS_MAPPINGS = {
-    "GaussianBlur": GaussianBlur
+    "Blur": Blur
 }
