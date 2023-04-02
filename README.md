@@ -18,6 +18,7 @@ A collection of post processing nodes for [ComfyUI](https://github.com/comfyanon
  - PixelSort: Rearranges the pixels in the input image based on their values, and input mask. Creates a cool glitch like effect.
  - Pixelize: Applies a pixelization effect, simulating the reducing of resolution
  - Sharpen: Enhances the details in an image by applying a sharpening filter
+ - Solarize: Inverts image colors based on a threshold for a striking, high-contrast effect
 
 ## Example workflow
 
