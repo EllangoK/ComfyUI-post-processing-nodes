@@ -30,12 +30,6 @@ class Blur:
 
     CATEGORY = "postprocessing"
 
-    def gaussian_kernel(self, kernel_size: int, sigma: float):
-        x, y = torch.meshgrid(torch.linspace(-1, 1, kernel_size), torch.linspace(-1, 1, kernel_size), indexing="ij")
-        d = torch.sqrt(x * x + y * y)
-        g = torch.exp(-(d * d) / (2.0 * sigma * sigma))
-        return g / g.sum()
-
     def blur(self, image: torch.Tensor, blur_radius: int, sigma: float):
         if blur_radius == 0:
             return (image,)
@@ -43,7 +37,7 @@ class Blur:
         batch_size, height, width, channels = image.shape
 
         kernel_size = blur_radius * 2 + 1
-        kernel = self.gaussian_kernel(kernel_size, sigma).repeat(channels, 1, 1).unsqueeze(1)
+        kernel = gaussian_kernel(kernel_size, sigma).repeat(channels, 1, 1).unsqueeze(1)
 
         image = image.permute(0, 3, 1, 2) # Torch wants (B, C, H, W) we use (B, H, W, C)
         blurred = F.conv2d(image, kernel, padding=kernel_size // 2, groups=channels)
@@ -54,3 +48,9 @@ class Blur:
 NODE_CLASS_MAPPINGS = {
     "Blur": Blur
 }
+
+def gaussian_kernel(kernel_size: int, sigma: float):
+    x, y = torch.meshgrid(torch.linspace(-1, 1, kernel_size), torch.linspace(-1, 1, kernel_size), indexing="ij")
+    d = torch.sqrt(x * x + y * y)
+    g = torch.exp(-(d * d) / (2.0 * sigma * sigma))
+    return g / g.sum()

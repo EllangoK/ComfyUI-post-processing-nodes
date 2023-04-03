@@ -13,6 +13,7 @@ A collection of post processing nodes for [ComfyUI](https://github.com/comfyanon
  - DodgeAndBurn: Adjusts image brightness using dodge and burn effects based on a mask and intensity.
  - FilmGrain: Adds a film grain effect to the image, along with options to control the temperature, and vignetting
  - Glow: Applies a blur with a specified radius and then blends it with the original image. Creates a nice glowing effect.
+ - PencilSketch: Converts an image into a hand-drawn pencil sketch style.
  - PixelSort: Rearranges the pixels in the input image based on their values, and input mask. Creates a cool glitch like effect.
  - Pixelize: Applies a pixelization effect, simulating the reducing of resolution
  - Quantize: Set and dither the amount of colors in an image from 0-256, reducing color information
