@@ -72,6 +72,9 @@ class Blend:
     CATEGORY = "postprocessing"
 
     def blend_images(self, image1: torch.Tensor, image2: torch.Tensor, blend_factor: float, blend_mode: str):
+        if image1.shape != image2.shape:
+            image2 = self.crop_and_resize(image2, image1.shape)
+
         blended_image = self.blend_mode(image1, image2, blend_mode)
         blended_image = image1 * (1 - blend_factor) + blended_image * blend_factor
         blended_image = torch.clamp(blended_image, 0, 1)
@@ -93,6 +96,29 @@ class Blend:
 
     def g(self, x):
         return torch.where(x <= 0.25, ((16 * x - 12) * x + 4) * x, torch.sqrt(x))
+
+    def crop_and_resize(self, img: torch.Tensor, target_shape: tuple):
+        batch_size, img_h, img_w, img_c = img.shape
+        _, target_h, target_w, _ = target_shape
+        img_aspect_ratio = img_w / img_h
+        target_aspect_ratio = target_w / target_h
+
+        # Crop center of the image to the target aspect ratio
+        if img_aspect_ratio > target_aspect_ratio:
+            new_width = int(img_h * target_aspect_ratio)
+            left = (img_w - new_width) // 2
+            img = img[:, :, left:left + new_width, :]
+        else:
+            new_height = int(img_w / target_aspect_ratio)
+            top = (img_h - new_height) // 2
+            img = img[:, top:top + new_height, :, :]
+
+        # Resize to target size
+        img = img.permute(0, 3, 1, 2) # Torch wants (B, C, H, W) we use (B, H, W, C)
+        img = F.interpolate(img, size=(target_h, target_w), mode='bilinear', align_corners=False)
+        img = img.permute(0, 2, 3, 1)
+
+        return img
 
 class Blur:
     def __init__(self):
@@ -124,7 +150,7 @@ class Blur:
     CATEGORY = "postprocessing"
 
     def gaussian_kernel(self, kernel_size: int, sigma: float):
-        x, y = torch.meshgrid(torch.linspace(-1, 1, kernel_size), torch.linspace(-1, 1, kernel_size))
+        x, y = torch.meshgrid(torch.linspace(-1, 1, kernel_size), torch.linspace(-1, 1, kernel_size), indexing="ij")
         d = torch.sqrt(x * x + y * y)
         g = torch.exp(-(d * d) / (2.0 * sigma * sigma))
         return g / g.sum()
@@ -323,63 +349,6 @@ class Dissolve:
         dissolved_image = image1 * mask + image2 * (1 - mask)
         dissolved_image = torch.clamp(dissolved_image, 0, 1)
         return (dissolved_image,)
-
-class Dither:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "bits": ("INT", {
-                    "default": 4,
-                    "min": 1,
-                    "max": 8,
-                    "step": 1
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "dither"
-
-    CATEGORY = "postprocessing"
-
-    def dither(self, image: torch.Tensor, bits: int):
-        batch_size, height, width, _ = image.shape
-        result = torch.zeros_like(image)
-
-        for b in range(batch_size):
-            tensor_image = image[b]
-            img = (tensor_image * 255)
-            height, width, _ = img.shape
-
-            scale = 255 / (2**bits - 1)
-
-            for y in range(height):
-                for x in range(width):
-                    old_pixel = img[y, x].clone()
-                    new_pixel = torch.round(old_pixel / scale) * scale
-                    img[y, x] = new_pixel
-
-                    quant_error = old_pixel - new_pixel
-
-                    if x + 1 < width:
-                        img[y, x + 1] += quant_error * 7 / 16
-                    if y + 1 < height:
-                        if x - 1 >= 0:
-                            img[y + 1, x - 1] += quant_error * 3 / 16
-                        img[y + 1, x] += quant_error * 5 / 16
-                        if x + 1 < width:
-                            img[y + 1, x + 1] += quant_error * 1 / 16
-
-            dithered = img / 255
-            tensor = dithered.unsqueeze(0)
-            result[b] = tensor
-
-        return (result,)
 
 class DodgeAndBurn:
     def __init__(self):
@@ -645,62 +614,6 @@ class Glow:
     def add_glow(self, img, blurred_img, intensity):
         return img + blurred_img * intensity
 
-class KMeansQuantize:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "colors": ("INT", {
-                    "default": 16,
-                    "min": 1,
-                    "max": 256,
-                    "step": 1
-                }),
-                "precision": ("INT", {
-                    "default": 10,
-                    "min": 1,
-                    "max": 100,
-                    "step": 1
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "kmeans_quantize"
-
-    CATEGORY = "postprocessing"
-
-    def kmeans_quantize(self, image: torch.Tensor, colors: int, precision: int):
-        batch_size, height, width, _ = image.shape
-        result = torch.zeros_like(image)
-
-        for b in range(batch_size):
-            tensor_image = image[b].numpy().astype(np.float32)
-            img = tensor_image
-
-            height, width, c = img.shape
-
-            criteria = (
-                cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
-                precision * 5, 0.01
-            )
-
-            img_copy = img.reshape(-1, c)
-            _, label, center = cv2.kmeans(
-                img_copy, colors, None,
-                criteria, 1, cv2.KMEANS_PP_CENTERS
-            )
-
-            img = center[label.flatten()].reshape(*img.shape)
-            tensor = torch.from_numpy(img).unsqueeze(0)
-            result[b] = tensor
-
-        return (result,)
-
 class PixelSort:
     def __init__(self):
         pass
@@ -784,6 +697,49 @@ class Pixelize:
         image = image.permute(0, 2, 3, 1)
 
         return image
+
+class Quantize:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "colors": ("INT", {
+                    "default": 256,
+                    "min": 1,
+                    "max": 256,
+                    "step": 1
+                }),
+                "dither": (["none", "floyd-steinberg"],),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "quantize"
+
+    CATEGORY = "postprocessing"
+
+    def quantize(self, image: torch.Tensor, colors: int = 256, dither: str = "FLOYDSTEINBERG"):
+        batch_size, height, width, _ = image.shape
+        result = torch.zeros_like(image)
+
+        dither_option = Image.Dither.FLOYDSTEINBERG if dither == "floyd-steinberg" else Image.Dither.NONE
+
+        for b in range(batch_size):
+            tensor_image = image[b]
+            img = (tensor_image * 255).to(torch.uint8).numpy()
+            pil_image = Image.fromarray(img, mode='RGB')
+
+            palette = pil_image.quantize(colors=colors) # Required as described in https://github.com/python-pillow/Pillow/issues/5836
+            quantized_image = pil_image.quantize(colors=colors, palette=palette, dither=dither_option)
+
+            quantized_array = torch.tensor(np.array(quantized_image.convert("RGB"))).float() / 255
+            result[b] = quantized_array
+
+        return (result,)
 
 class Sharpen:
     def __init__(self):
@@ -961,13 +917,12 @@ NODE_CLASS_MAPPINGS = {
     "CannyEdgeDetection": CannyEdgeDetection,
     "ColorCorrect": ColorCorrect,
     "Dissolve": Dissolve,
-    "Dither": Dither,
     "DodgeAndBurn": DodgeAndBurn,
     "FilmGrain": FilmGrain,
     "Glow": Glow,
-    "KMeansQuantize": KMeansQuantize,
     "PixelSort": PixelSort,
     "Pixelize": Pixelize,
+    "Quantize": Quantize,
     "Sharpen": Sharpen,
     "Solarize": Solarize,
 }
