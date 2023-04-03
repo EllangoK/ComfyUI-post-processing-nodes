@@ -31,7 +31,7 @@ class Blur:
     CATEGORY = "postprocessing"
 
     def gaussian_kernel(self, kernel_size: int, sigma: float):
-        x, y = torch.meshgrid(torch.linspace(-1, 1, kernel_size), torch.linspace(-1, 1, kernel_size))
+        x, y = torch.meshgrid(torch.linspace(-1, 1, kernel_size), torch.linspace(-1, 1, kernel_size), indexing="ij")
         d = torch.sqrt(x * x + y * y)
         g = torch.exp(-(d * d) / (2.0 * sigma * sigma))
         return g / g.sum()
