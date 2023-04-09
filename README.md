@@ -17,6 +17,7 @@ Both images have the workflow attached, and it is included so feel free to use i
  - Blend: Blends two images together with a variety of different modes
  - Blur: Applies a Gaussian blur to the input image, softening the details
  - CannyEdgeDetection: Applies Canny edge detection to the input image
+ - Chromatic Aberration: Shifts the color channels in an image, creating a glitch aesthetic
  - ColorCorrect: Adjusts the color balance, temperature, hue, brightness, contrast, saturation, and gamma of an image
  - Dissolve: Creates a grainy blend of two images using random pixels based on a dissolve factor.
  - DodgeAndBurn: Adjusts image brightness using dodge and burn effects based on a mask and intensity.
@@ -28,6 +29,7 @@ Both images have the workflow attached, and it is included so feel free to use i
  - Quantize: Set and dither the amount of colors in an image from 0-256, reducing color information
  - Sharpen: Enhances the details in an image by applying a sharpening filter
  - Solarize: Inverts image colors based on a threshold for a striking, high-contrast effect
+ - Vignette: Applies a vignette effect, putting the corners of the image in shadow
 
 ## Combine Nodes
 
