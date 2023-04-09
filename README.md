@@ -2,6 +2,15 @@
 
 A collection of post processing nodes for [ComfyUI](https://github.com/comfyanonymous/ComfyUI), simply download this repo and drag `post_processing_nodes.py` into your `custom_nodes/` folder
 
+## Example Image and Workflow
+
+<p align="center">
+  <img src="examples/workflow_output.png" width="50%" />
+  <img src="examples/example_workflow.png"/>
+</p>
+
+Both images have the workflow attached, and it is included so feel free to use it as base
+
 ## Node List
 
  - ArithmeticBlend: Blends two images using arithmetic operations like addition, subtraction, and difference.
@@ -20,10 +29,6 @@ A collection of post processing nodes for [ComfyUI](https://github.com/comfyanon
  - Sharpen: Enhances the details in an image by applying a sharpening filter
  - Solarize: Inverts image colors based on a threshold for a striking, high-contrast effect
 
-## Example workflow
-
-![__image__](images/example-workflow.png)
-
 ## Combine Nodes
 
 By default `post_processing_nodes.py` should have all of the combined nodes. If you want a subset of nodes, you can run
@@ -35,3 +40,7 @@ or just run
     python combine_files.py -h
 
 for more help
+
+## Old Nodes
+
+Some nodes have been have been added to the main repo, feel free to use those instead as they work perfectly fine. Old versions are still kept around for backwards compatability.
