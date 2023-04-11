@@ -3,12 +3,9 @@ import torch.nn.functional as F
 import cv2
 import numpy as np
 from PIL import Image, ImageEnhance
+import multiprocessing as mp
 from PIL import Image
-import imageio.v2 as imageio
-from math import sqrt
-import sys
-import argparse
-import os
+import time
 import random
 
 
@@ -661,6 +658,121 @@ class Glow:
     def add_glow(self, img, blurred_img, intensity):
         return img + blurred_img * intensity
 
+class KuwaharaBlur:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "blur_radius": ("INT", {
+                    "default": 3,
+                    "min": 0,
+                    "max": 31,
+                    "step": 1
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "apply_kuwahara_filter"
+
+    CATEGORY = "postprocessing"
+
+    def apply_kuwahara_filter(self, image: np.ndarray, blur_radius: int):
+        if blur_radius == 0:
+            return (image,)
+
+        out = torch.zeros_like(image)
+        batch_size, height, width, channels = image.shape
+
+        for b in range(batch_size):
+            image = image[b].cpu().numpy() * 255.0
+            image = image.astype(np.uint8)
+
+            out[b] = torch.from_numpy(kuwahara(image, method="gaussian", radius=blur_radius)) / 255.0
+
+        return (out,)
+
+def kuwahara(orig_img, method="mean", radius=3, sigma=None, grayconv=cv2.COLOR_BGR2GRAY, image_2d=None):
+    if method == "gaussian" and sigma is None:
+        sigma = -1
+
+    image = orig_img.astype(np.float32, copy=False)
+    image_2d = image_2d.astype(image.dtype, copy=False) if image_2d is not None else None
+    avgs = np.empty((4, *image.shape), dtype=image.dtype)
+    stddevs = np.empty((4, *image.shape[:2]), dtype=image.dtype)
+
+    if image_2d is None:
+        image_2d = cv2.cvtColor(orig_img, grayconv).astype(image.dtype, copy=False)
+    avgs_2d = np.empty((4, *image.shape[:2]), dtype=image.dtype)
+
+    squared_img = image_2d ** 2
+
+    if method == "mean":
+        kxy = np.ones(radius + 1, dtype=image.dtype) / (radius + 1)
+    elif method == "gaussian":
+        kxy = cv2.getGaussianKernel(2 * radius + 1, sigma, ktype=cv2.CV_32F)
+        kxy /= kxy[radius:].sum()
+        klr = np.array([kxy[:radius+1], kxy[radius:]])
+        kindexes = [[1, 1], [1, 0], [0, 1], [0, 0]]
+
+    shift = [(0, 0), (0, radius), (radius, 0), (radius, radius)]
+
+    for k in range(4):
+        kx, ky = kxy, kxy if method == "mean" else klr[kindexes[k]]
+        cv2.sepFilter2D(image, -1, kx, ky, avgs[k], shift[k])
+        cv2.sepFilter2D(image_2d, -1, kx, ky, avgs_2d[k], shift[k])
+        cv2.sepFilter2D(squared_img, -1, kx, ky, stddevs[k], shift[k])
+        stddevs[k] = stddevs[k] - avgs_2d[k] ** 2
+
+    indices = np.argmin(stddevs, axis=0)
+    filtered = np.take_along_axis(avgs, indices[None,...,None], 0).reshape(image.shape)
+
+    return filtered.astype(orig_img.dtype)
+
+class Parabolize:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "coeff": ("FLOAT", {
+                    "default": 1.0,
+                    "min": -10.0,
+                    "max": 10.0,
+                    "step": 0.1
+                }),
+                "vertex_x": ("FLOAT", {
+                    "default": 0.5,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.1
+                }),
+                "vertex_y": ("FLOAT", {
+                    "default": 0.5,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.1
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "parabolize_image"
+
+    CATEGORY = "postprocessing"
+
+    def parabolize_image(self, image: torch.Tensor, coeff: float, vertex_x: float, vertex_y: float):
+        parabolized_image = coeff * torch.pow(image - vertex_x, 2) + vertex_y
+        parabolized_image = torch.clamp(parabolized_image, 0, 1)
+        return (parabolized_image,)
+
 class PencilSketch:
     def __init__(self):
         pass
@@ -1068,6 +1180,189 @@ class ElectroShock:
 
         return (result,)
 
+class KuwaharaFilter:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "blur_radius": ("INT", {
+                    "default": 1,
+                    "min": 0,
+                    "max": 15,
+                    "step": 1
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "apply_kuwahara_filter"
+
+    CATEGORY = "postprocessing"
+
+    def apply_kuwahara_filter(self, image: np.ndarray, blur_radius: int):
+        if blur_radius == 0:
+            return (image,)
+
+        kernel_size = blur_radius * 2 + 1
+        out = torch.zeros_like(image)
+
+        batch_size, height, width, channels = image.shape
+
+        for b in range(batch_size):
+            image = image[b].cpu().numpy() * 255.0
+            image = image.astype(np.uint8)
+
+            out[b] = torch.from_numpy(kuwahara_filter_rgb(image, kernel_size)) / 255.0
+
+        return (out,)
+
+def kuwahara_filter_rgb(img, kernel_size):
+    b, g, r = cv2.split(img)
+
+    b_filtered, g_filtered, r_filtered = apply_filter((b, kernel_size)), apply_filter((g, kernel_size)), apply_filter((r, kernel_size))
+
+    out = cv2.merge((b_filtered, g_filtered, r_filtered))
+
+    return out
+
+def apply_filter(args):
+    channel, kernel_size = args
+    return kuwahara_filter(channel, kernel_size)
+
+def kuwahara_filter(img, kernel_size):
+    # Pad the image to handle borders
+    pad_size = kernel_size // 2
+    img_padded = cv2.copyMakeBorder(img, pad_size, pad_size, pad_size, pad_size, cv2.BORDER_REFLECT)
+
+    # Initialize output image
+    h, w = img.shape[:2]
+    out = np.zeros_like(img)
+
+    # Apply Kuwahara filter to each pixel
+    for i in range(pad_size, h + pad_size):
+        for j in range(pad_size, w + pad_size):
+            # Divide the image into 4 overlapping square regions
+            regions = [
+                img_padded[i-pad_size:i+pad_size+1, j-pad_size:j+pad_size+1],
+                img_padded[i-pad_size:i+pad_size+1, j:j+kernel_size+1],
+                img_padded[i:i+kernel_size+1, j-pad_size:j+pad_size+1],
+                img_padded[i:i+kernel_size+1, j:j+kernel_size+1]
+            ]
+
+            # Compute mean and variance of each region
+            means = [np.mean(region) for region in regions]
+            variances = [np.var(region) for region in regions]
+
+            # Choose the region with the smallest variance as the output value
+            min_var_index = np.argmin(variances)
+            out[i-pad_size, j-pad_size] = means[min_var_index]
+
+    return out
+
+class Liquidify:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "viscosity": ("INT", {
+                    "default": 10,
+                    "min": 0,
+                    "max": 20,
+                    "step": 1
+                }),
+                "turbulence": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.0,
+                    "max": 2.0,
+                    "step": 0.1
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "liquidify"
+
+    CATEGORY = "postprocessing"
+
+    def liquidify(image: torch.Tensor, viscosity: int, turbulence: float):
+        image = image.permute(0, 3, 1, 2)  # Torch wants (B, C, H, W) we use (B, H, W, C)
+
+        n, c, h, w = image.size()
+        grid_x, grid_y = torch.meshgrid(torch.arange(h), torch.arange(w))
+        grid_x = grid_x.to(image.device)
+        grid_y = grid_y.to(image.device)
+
+        displacement = torch.randn(n, 2, h, w).to(image.device)
+        displacement = F.gaussian_blur(displacement, kernel_size=viscosity, sigma=turbulence)
+
+        flow_x = torch.clamp(grid_x + displacement[:, 0], 0, w - 1).unsqueeze(1) - grid_x.unsqueeze(0)
+        flow_y = torch.clamp(grid_y + displacement[:, 1], 0, h - 1).unsqueeze(1) - grid_y.unsqueeze(0)
+
+        warped = F.grid_sample(image, torch.stack((flow_x, flow_y), dim=1), padding_mode='border')
+
+        warped = warped.permute(0, 2, 3, 1)  # Back to (B, H, W, C)
+        return (warped,)
+
+class StippleEffect:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "dot_size": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.1,
+                    "max": 5.0,
+                    "step": 0.1
+                }),
+                "density": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.1,
+                    "max": 5.0,
+                    "step": 0.1
+                }),
+                "intensity": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.1,
+                    "max": 5.0,
+                    "step": 0.1
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "stipple_effect"
+
+    CATEGORY = "postprocessing"
+
+    def stipple_effect(self, image: torch.Tensor, dot_size: float, density: float, intensity: float):
+        def create_dot_pattern(dot_size, intensity):
+            dot_pattern = torch.ones((1, 1, int(dot_size), int(dot_size))) * intensity
+            return dot_pattern
+
+        x = image.permute(0, 3, 1, 2)
+        gray_image = x.mean(dim=1, keepdim=True)
+        dot_pattern = create_dot_pattern(dot_size, intensity)
+
+        stippled_image = torch.nn.functional.conv2d(gray_image, dot_pattern, stride=int(dot_size), groups=1)
+        stippled_image = torch.clamp(stippled_image, 0, 1)
+
+        output = stippled_image.expand(-1, 3, -1, -1)
+        output = output.permute(0, 2, 3, 1)
+
+        return (output,)
+
 def gaussian_kernel(kernel_size: int, sigma: float):
     x, y = torch.meshgrid(torch.linspace(-1, 1, kernel_size), torch.linspace(-1, 1, kernel_size), indexing="ij")
     d = torch.sqrt(x * x + y * y)
@@ -1165,115 +1460,88 @@ def pixel_sort(img, mask, horizontal_sort=False, span_limit=None, sort_by='H', r
 
     return sorted_image
 
-def get_fish_xn_yn(source_x, source_y, radius, distortion):
-    """
-    Get normalized x, y pixel coordinates from the original image and return normalized 
-    x, y pixel coordinates in the destination fished image.
-    :param distortion: Amount in which to move pixels from/to center.
-    As distortion grows, pixels will be moved further from the center, and vice versa.
-    """
+def kuwahara_filter(img, kernel_size):
+    # Pad the image to handle borders
+    pad_size = kernel_size // 2
+    img_padded = cv2.copyMakeBorder(img, pad_size, pad_size, pad_size, pad_size, cv2.BORDER_REFLECT)
 
-    if 1 - distortion*(radius**2) == 0:
-        return source_x, source_y
+    # Initialize output image
+    h, w = img.shape[:2]
+    out = np.zeros_like(img)
 
-    return source_x / (1 - (distortion*(radius**2))), source_y / (1 - (distortion*(radius**2)))
+    # Apply Kuwahara filter to each pixel
+    for i in range(pad_size, h + pad_size):
+        for j in range(pad_size, w + pad_size):
+            # Divide the image into 4 overlapping square regions
+            regions = [
+                img_padded[i-pad_size:i+pad_size+1, j-pad_size:j+pad_size+1],
+                img_padded[i-pad_size:i+pad_size+1, j:j+kernel_size+1],
+                img_padded[i:i+kernel_size+1, j-pad_size:j+pad_size+1],
+                img_padded[i:i+kernel_size+1, j:j+kernel_size+1]
+            ]
 
+            # Compute mean and variance of each region
+            means = [np.mean(region) for region in regions]
+            variances = [np.var(region) for region in regions]
 
+            # Choose the region with the smallest variance as the output value
+            min_var_index = np.argmin(variances)
+            out[i-pad_size, j-pad_size] = means[min_var_index]
 
-def fish(img, distortion_coefficient):
-    """
-    :type img: numpy.ndarray
-    :param distortion_coefficient: The amount of distortion to apply.
-    :return: numpy.ndarray - the image with applied effect.
-    """
-
-    # If input image is only BW or RGB convert it to RGBA
-    # So that output 'frame' can be transparent.
-    w, h = img.shape[0], img.shape[1]
-    if len(img.shape) == 2:
-        # Duplicate the one BW channel twice to create Black and White
-        # RGB image (For each pixel, the 3 channels have the same value)
-        bw_channel = np.copy(img)
-        img = np.dstack((img, bw_channel))
-        img = np.dstack((img, bw_channel))
-    if len(img.shape) == 3 and img.shape[2] == 3:
-        print("RGB to RGBA")
-        img = np.dstack((img, np.full((w, h), 255)))
-
-    # prepare array for dst image
-    dstimg = np.zeros_like(img)
-
-    # floats for calcultions
-    w, h = float(w), float(h)
-
-    # easier calcultion if we traverse x, y in dst image
-    for x in range(len(dstimg)):
-        for y in range(len(dstimg[x])):
-
-            # normalize x and y to be in interval of [-1, 1]
-            xnd, ynd = float((2*x - w)/w), float((2*y - h)/h)
-
-            # get xn and yn distance from normalized center
-            rd = sqrt(xnd**2 + ynd**2)
-
-            # new normalized pixel coordinates
-            xdu, ydu = get_fish_xn_yn(xnd, ynd, rd, distortion_coefficient)
-
-            # convert the normalized distorted xdn and ydn back to image pixels
-            xu, yu = int(((xdu + 1)*w)/2), int(((ydu + 1)*h)/2)
-
-            # if new pixel is in bounds copy from source pixel to destination pixel
-            if 0 <= xu and xu < img.shape[0] and 0 <= yu and yu < img.shape[1]:
-                dstimg[x][y] = img[xu][yu]
-
-    return dstimg.astype(np.uint8)
+    return out
 
 
+def kuwahara_filter_rgb(img, kernel_size):
+    # Split the image into color channels
+    b, g, r = cv2.split(img)
 
-def parse_args(args=sys.argv[1:]):
-    """Parse arguments."""
+    # Apply the filter to each channel
+    b_filtered = kuwahara_filter(b, kernel_size)
+    g_filtered = kuwahara_filter(g, kernel_size)
+    r_filtered = kuwahara_filter(r, kernel_size)
 
-    parser = argparse.ArgumentParser(
-        description="Apply fish-eye effect to images.",
-        prog='python3 fish.py')
+    # Merge the filtered channels back into an RGB image
+    out = cv2.merge((b_filtered, g_filtered, r_filtered))
 
-    parser.add_argument("-i", "--image", help="path to image file."
-                        " If no input is given, the supplied example 'grid.jpg' will be used.",
-                        type=str, default="test.png")
-
-    parser.add_argument("-o", "--outpath", help="file path to write output to."
-                        " format: <path>.<format(jpg,png,etc..)>",
-                        type=str, default="fish.png")
-
-    parser.add_argument("-d", "--distortion",
-                        help="The distoration coefficient. How much the move pixels from/to the center."
-                        " Recommended values are between -1 and 1."
-                        " The bigger the distortion, the further pixels will be moved outwars from the center (fisheye)."
-                        " The Smaller the distortion, the closer pixels will be move inwards toward the center (rectilinear)."
-                        " For example, to reverse the fisheye effect with --distoration 0.5,"
-                        " You can run with --distortion -0.3."
-                        " Note that due to double processing the result will be somewhat distorted.",
-                        type=float, default=0.5)
-
-    return parser.parse_args(args)
+    return out
 
 
-if __name__ == "__main__":
-    args = parse_args()
-    try:
-        imgobj = imageio.imread(args.image)
-    except Exception as e:
-        print(e)
-        sys.exit(1)
-    if os.path.exists(args.outpath):
-        ans = input(
-            args.outpath + " exists. File will be overridden. Continue? y/n: ")
-        if ans.lower() != 'y':
-            print("exiting")
-            sys.exit(0)
+def apply_filter(args):
+    channel, kernel_size = args
+    return kuwahara_filter(channel, kernel_size)
 
-    output_img = fish(imgobj, args.distortion)
-    imageio.imwrite(args.outpath, output_img, format='png')
+
+def kuwahara_filter_rgb_multiprocessing(img, kernel_size):
+    # Split the image into color channels
+    b, g, r = cv2.split(img)
+
+    # Function to apply the filter to a channel
+
+    # Create a multiprocessing Pool with 3 processes
+    with mp.Pool(3) as pool:
+        # Map the apply_filter function to the channels
+        b_filtered, g_filtered, r_filtered = pool.map(apply_filter, ((b, kernel_size), (g, kernel_size), (r, kernel_size)))
+
+    # Merge the filtered channels back into an RGB image
+    out = cv2.merge((b_filtered, g_filtered, r_filtered))
+
+    return out
+
+if __name__ == '__main__':
+
+    img = cv2.imread('test.png')
+
+    start_time = time.time()
+    # Apply Kuwahara filter with kernel size of 5
+    out = kuwahara_filter_rgb_multiprocessing(img, kernel_size=5)
+    end_time = time.time()
+    print(f"Time elapsed: {end_time - start_time:.5f} seconds")
+
+    # Display output image
+    cv2.imshow('output_image', out)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
 
 NODE_CLASS_MAPPINGS = {
     "ArithmeticBlend": ArithmeticBlend,
@@ -1286,6 +1554,8 @@ NODE_CLASS_MAPPINGS = {
     "DodgeAndBurn": DodgeAndBurn,
     "FilmGrain": FilmGrain,
     "Glow": Glow,
+    "KuwaharaBlur": KuwaharaBlur,
+    "Parabolize": Parabolize,
     "PencilSketch": PencilSketch,
     "PixelSort": PixelSort,
     "Pixelize": Pixelize,
@@ -1294,4 +1564,7 @@ NODE_CLASS_MAPPINGS = {
     "Solarize": Solarize,
     "Vignette": Vignette,
     "ElectroShock": ElectroShock,
+    "KuwaharaFilter": KuwaharaFilter,
+    "Liquidify": Liquidify,
+    "StippleEffect": StippleEffect,
 }
