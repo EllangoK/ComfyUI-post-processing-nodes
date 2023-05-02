@@ -1,6 +1,6 @@
 #  ComfyUI-post-processing-nodes
 
-A collection of post processing nodes for [ComfyUI](https://github.com/comfyanonymous/ComfyUI), simply download this repo and drag `post_processing_nodes.py` into your `custom_nodes/` folder
+A collection of post processing nodes for [ComfyUI](https://github.com/comfyanonymous/ComfyUI), which enable a variety of visually striking image effects 
 
 ## Example Image and Workflow
 
@@ -9,31 +9,48 @@ A collection of post processing nodes for [ComfyUI](https://github.com/comfyanon
   <img src="examples/example_workflow.png"/>
 </p>
 
-Both images have the workflow attached, and it is included so feel free to use it as base
+Both images have the workflow attached, and are included with the repo. Feel free to submit more examples as well!
 
-## Node List
+---
+
+<details>
+	<summary>$\Large\color{#00A7B5}\text{Expand Node List}$</summary>
+
+<br/>
 
  - ArithmeticBlend: Blends two images using arithmetic operations like addition, subtraction, and difference.
  - Blend: Blends two images together with a variety of different modes
  - Blur: Applies a Gaussian blur to the input image, softening the details
  - CannyEdgeDetection: Applies Canny edge detection to the input image
  - Chromatic Aberration: Shifts the color channels in an image, creating a glitch aesthetic
- - **ColorCorrect: Adjusts the color balance, temperature, hue, brightness, contrast, saturation, and gamma of an image**
+ - $\color{#00A7B5}\textbf{ColorCorrect:}$ Adjusts the color balance, temperature, hue, brightness, contrast, saturation, and gamma of an image
  - Dissolve: Creates a grainy blend of two images using random pixels based on a dissolve factor.
  - DodgeAndBurn: Adjusts image brightness using dodge and burn effects based on a mask and intensity.
  - FilmGrain: Adds a film grain effect to the image, along with options to control the temperature, and vignetting
  - Glow: Applies a blur with a specified radius and then blends it with the original image. Creates a nice glowing effect.
- - **KuwaharaBlur: Applies an edge preserving blur, creating a stunning and unique effect.**
+ - $\color{#00A7B5}\textbf{KuwaharaBlur:}$ Applies an edge preserving blur, creating a more realistic blur than Gaussian.
  - Parabolize: Applies a color transformation effect using a parabolic formula
  - PencilSketch: Converts an image into a hand-drawn pencil sketch style.
- - **PixelSort: Rearranges the pixels in the input image based on their values, and input mask. Creates a cool glitch like effect.**
+ - $\color{#00A7B5}\textbf{PixelSort:}$ Rearranges the pixels in the input image based on their values, and input mask. Creates a cool glitch like effect.
  - Pixelize: Applies a pixelization effect, simulating the reducing of resolution
- - **Quantize: Set and dither the amount of colors in an image from 0-256, reducing color information**
+ - $\color{#00A7B5}\textbf{Quantize:}$ Set and dither the amount of colors in an image from 0-256, reducing color information
  - Sharpen: Enhances the details in an image by applying a sharpening filter
- - **Solarize: Inverts image colors based on a threshold for a striking, high-contrast effect**
+ - $\color{#00A7B5}\textbf{Solarize:}$ Inverts image colors based on a threshold for a striking, high-contrast effect
  - Vignette: Applies a vignette effect, putting the corners of the image in shadow
+ 
+ 
+$\color{#00A7B5}\textbf{Bolded Color Nodes}$ are my personal favorites, and highly recommended to expirement with
 
-**Bolded Nodes are my Personal Favorites, and highly recommended to expirement with**
+</details>
+
+---
+
+## Install
+
+To install these nodes 
+
+  - Navigate to your `/ComfyUI/custom_nodes/` folder
+  - Run `git clone https://github.com/EllangoK/ComfyUI-post-processing-nodes/`
 
 ## Combine Nodes
 
