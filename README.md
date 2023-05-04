@@ -34,11 +34,11 @@ Both images have the workflow attached, and are included with the repo. Feel fre
  - $\color{#00A7B5}\textbf{PixelSort:}$ Rearranges the pixels in the input image based on their values, and input mask. Creates a cool glitch like effect.
  - Pixelize: Applies a pixelization effect, simulating the reducing of resolution
  - $\color{#00A7B5}\textbf{Quantize:}$ Set and dither the amount of colors in an image from 0-256, reducing color information
+ - Sepia: Applies a mellow tone mapping, yielding an archival or vintage appearance
  - Sharpen: Enhances the details in an image by applying a sharpening filter
  - $\color{#00A7B5}\textbf{Solarize:}$ Inverts image colors based on a threshold for a striking, high-contrast effect
  - Vignette: Applies a vignette effect, putting the corners of the image in shadow
- 
- 
+
 $\color{#00A7B5}\textbf{Bolded Color Nodes}$ are my personal favorites, and highly recommended to expirement with
 
 </details>

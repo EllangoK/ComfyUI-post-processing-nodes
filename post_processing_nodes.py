@@ -5,8 +5,6 @@ import numpy as np
 from PIL import Image, ImageEnhance
 import multiprocessing as mp
 from PIL import Image
-import time
-import random
 
 
 class ArithmeticBlend:
@@ -673,6 +671,7 @@ class KuwaharaBlur:
                     "max": 31,
                     "step": 1
                 }),
+                "method": (["mean", "gaussian"],),
             },
         }
 
@@ -681,7 +680,7 @@ class KuwaharaBlur:
 
     CATEGORY = "postprocessing"
 
-    def apply_kuwahara_filter(self, image: np.ndarray, blur_radius: int):
+    def apply_kuwahara_filter(self, image: np.ndarray, blur_radius: int, method: str):
         if blur_radius == 0:
             return (image,)
 
@@ -692,21 +691,18 @@ class KuwaharaBlur:
             image = image[b].cpu().numpy() * 255.0
             image = image.astype(np.uint8)
 
-            out[b] = torch.from_numpy(kuwahara(image, method="gaussian", radius=blur_radius)) / 255.0
+            out[b] = torch.from_numpy(kuwahara(image, method=method, radius=blur_radius)) / 255.0
 
         return (out,)
 
-def kuwahara(orig_img, method="mean", radius=3, sigma=None, grayconv=cv2.COLOR_BGR2GRAY, image_2d=None):
+def kuwahara(orig_img, method="mean", radius=3, sigma=None):
     if method == "gaussian" and sigma is None:
         sigma = -1
 
     image = orig_img.astype(np.float32, copy=False)
-    image_2d = image_2d.astype(image.dtype, copy=False) if image_2d is not None else None
     avgs = np.empty((4, *image.shape), dtype=image.dtype)
     stddevs = np.empty((4, *image.shape[:2]), dtype=image.dtype)
-
-    if image_2d is None:
-        image_2d = cv2.cvtColor(orig_img, grayconv).astype(image.dtype, copy=False)
+    image_2d = cv2.cvtColor(orig_img, cv2.COLOR_BGR2GRAY).astype(image.dtype, copy=False)
     avgs_2d = np.empty((4, *image.shape[:2]), dtype=image.dtype)
 
     squared_img = image_2d ** 2
@@ -722,7 +718,10 @@ def kuwahara(orig_img, method="mean", radius=3, sigma=None, grayconv=cv2.COLOR_B
     shift = [(0, 0), (0, radius), (radius, 0), (radius, radius)]
 
     for k in range(4):
-        kx, ky = kxy, kxy if method == "mean" else klr[kindexes[k]]
+        if method == "mean":
+            kx, ky = kxy, kxy
+        else:
+            kx, ky = klr[kindexes[k]]
         cv2.sepFilter2D(image, -1, kx, ky, avgs[k], shift[k])
         cv2.sepFilter2D(image_2d, -1, kx, ky, avgs_2d[k], shift[k])
         cv2.sepFilter2D(squared_img, -1, kx, ky, stddevs[k], shift[k])
@@ -985,6 +984,42 @@ class Quantize:
 
         return (result,)
 
+class Sepia:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "strength": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.1,
+                    "max": 1.0,
+                    "step": 0.1
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "sepia"
+
+    CATEGORY = "postprocessing"
+
+    def sepia(self, image: torch.Tensor, strength: float):
+        if strength == 0:
+            return (image,)
+
+        sepia_weights = torch.tensor([0.2989, 0.5870, 0.1140]).view(1, 1, 1, 3).to(image.device)
+        sepia_filter = torch.tensor([1.0, 0.8, 0.6]).view(1, 1, 1, 3).to(image.device)
+
+        grayscale = torch.sum(image * sepia_weights, dim=-1, keepdim=True)
+        sepia = grayscale * sepia_filter
+
+        result = sepia * strength + image * (1 - strength)
+        return (result,)
+
 class Sharpen:
     def __init__(self):
         pass
@@ -1104,265 +1139,6 @@ class Vignette:
 
         return (vignette_image,)
 
-class ElectroShock:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "glow_intensity": ("INT", {"default": 50, "min": 0, "max": 100, "step": 1}),
-                "line_frequency": ("INT", {"default": 25, "min": 0, "max": 100, "step": 1}),
-                "line_thickness": ("INT", {"default": 2, "min": 1, "max": 10, "step": 1}),
-                "random_seed": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1}),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "electro_shock"
-
-    CATEGORY = "effects"
-
-    def midpoint_displacement(self, x1, y1, x2, y2, displacement, mask, line_thickness):
-        if abs(x2 - x1) < 2 and abs(y2 - y1) < 2:
-            return
-
-        mid_x = (x1 + x2) // 2
-        mid_y = (y1 + y2) // 2
-
-        mid_x += int(random.uniform(-displacement, displacement))
-        mid_y += int(random.uniform(-displacement, displacement))
-
-        cv2.line(mask, (x1, y1), (mid_x, mid_y), 255, line_thickness)
-        cv2.line(mask, (mid_x, mid_y), (x2, y2), 255, line_thickness)
-
-        self.midpoint_displacement(x1, y1, mid_x, mid_y, displacement / 2, mask, line_thickness)
-        self.midpoint_displacement(mid_x, mid_y, x2, y2, displacement / 2, mask, line_thickness)
-
-
-    def electro_shock(self, image: torch.Tensor, glow_intensity: int, line_frequency: int, line_thickness: int, random_seed: int = None):
-        if random_seed is not None:
-            random.seed(random_seed)
-            np.random.seed(random_seed)
-
-        line_color = [255, 255, 255]
-
-        batch_size, height, width, _ = image.shape
-        result = torch.zeros_like(image)
-
-        for b in range(batch_size):
-            tensor_image = image[b]
-            img = (tensor_image * 255).to(torch.uint8).numpy()
-
-            # Apply the ElectroShock effect using OpenCV functions
-            mask = np.zeros((height, width), np.uint8)
-            num_lines = int(line_frequency * (height * width) / 100000)
-            initial_displacement = int(height / 8)
-
-            for _ in range(num_lines):
-                x1, y1 = random.randint(0, width - 1), random.randint(0, height - 1)
-                x2, y2 = random.randint(0, width - 1), random.randint(0, height - 1)
-                self.midpoint_displacement(x1, y1, x2, y2, initial_displacement, mask, line_thickness)
-
-            # Apply glow effect
-            glow_radius = int(glow_intensity * 0.1)
-            mask_blurred = cv2.GaussianBlur(mask, (glow_radius * 2 + 1, glow_radius * 2 + 1), 0)
-
-            # Add glow to the original image
-            colored_mask = cv2.cvtColor(mask_blurred, cv2.COLOR_GRAY2BGR)
-            colored_mask[np.where((colored_mask == [255, 255, 255]).all(axis=2))] = line_color
-            electro_shock_img = cv2.addWeighted(img, 1, colored_mask, glow_intensity / 100, 0)
-
-            electro_shock_array = torch.tensor(electro_shock_img).float() / 255
-            result[b] = electro_shock_array
-
-        return (result,)
-
-class KuwaharaFilter:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "blur_radius": ("INT", {
-                    "default": 1,
-                    "min": 0,
-                    "max": 15,
-                    "step": 1
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "apply_kuwahara_filter"
-
-    CATEGORY = "postprocessing"
-
-    def apply_kuwahara_filter(self, image: np.ndarray, blur_radius: int):
-        if blur_radius == 0:
-            return (image,)
-
-        kernel_size = blur_radius * 2 + 1
-        out = torch.zeros_like(image)
-
-        batch_size, height, width, channels = image.shape
-
-        for b in range(batch_size):
-            image = image[b].cpu().numpy() * 255.0
-            image = image.astype(np.uint8)
-
-            out[b] = torch.from_numpy(kuwahara_filter_rgb(image, kernel_size)) / 255.0
-
-        return (out,)
-
-def kuwahara_filter_rgb(img, kernel_size):
-    b, g, r = cv2.split(img)
-
-    b_filtered, g_filtered, r_filtered = apply_filter((b, kernel_size)), apply_filter((g, kernel_size)), apply_filter((r, kernel_size))
-
-    out = cv2.merge((b_filtered, g_filtered, r_filtered))
-
-    return out
-
-def apply_filter(args):
-    channel, kernel_size = args
-    return kuwahara_filter(channel, kernel_size)
-
-def kuwahara_filter(img, kernel_size):
-    # Pad the image to handle borders
-    pad_size = kernel_size // 2
-    img_padded = cv2.copyMakeBorder(img, pad_size, pad_size, pad_size, pad_size, cv2.BORDER_REFLECT)
-
-    # Initialize output image
-    h, w = img.shape[:2]
-    out = np.zeros_like(img)
-
-    # Apply Kuwahara filter to each pixel
-    for i in range(pad_size, h + pad_size):
-        for j in range(pad_size, w + pad_size):
-            # Divide the image into 4 overlapping square regions
-            regions = [
-                img_padded[i-pad_size:i+pad_size+1, j-pad_size:j+pad_size+1],
-                img_padded[i-pad_size:i+pad_size+1, j:j+kernel_size+1],
-                img_padded[i:i+kernel_size+1, j-pad_size:j+pad_size+1],
-                img_padded[i:i+kernel_size+1, j:j+kernel_size+1]
-            ]
-
-            # Compute mean and variance of each region
-            means = [np.mean(region) for region in regions]
-            variances = [np.var(region) for region in regions]
-
-            # Choose the region with the smallest variance as the output value
-            min_var_index = np.argmin(variances)
-            out[i-pad_size, j-pad_size] = means[min_var_index]
-
-    return out
-
-class Liquidify:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "viscosity": ("INT", {
-                    "default": 10,
-                    "min": 0,
-                    "max": 20,
-                    "step": 1
-                }),
-                "turbulence": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.0,
-                    "max": 2.0,
-                    "step": 0.1
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "liquidify"
-
-    CATEGORY = "postprocessing"
-
-    def liquidify(image: torch.Tensor, viscosity: int, turbulence: float):
-        image = image.permute(0, 3, 1, 2)  # Torch wants (B, C, H, W) we use (B, H, W, C)
-
-        n, c, h, w = image.size()
-        grid_x, grid_y = torch.meshgrid(torch.arange(h), torch.arange(w))
-        grid_x = grid_x.to(image.device)
-        grid_y = grid_y.to(image.device)
-
-        displacement = torch.randn(n, 2, h, w).to(image.device)
-        displacement = F.gaussian_blur(displacement, kernel_size=viscosity, sigma=turbulence)
-
-        flow_x = torch.clamp(grid_x + displacement[:, 0], 0, w - 1).unsqueeze(1) - grid_x.unsqueeze(0)
-        flow_y = torch.clamp(grid_y + displacement[:, 1], 0, h - 1).unsqueeze(1) - grid_y.unsqueeze(0)
-
-        warped = F.grid_sample(image, torch.stack((flow_x, flow_y), dim=1), padding_mode='border')
-
-        warped = warped.permute(0, 2, 3, 1)  # Back to (B, H, W, C)
-        return (warped,)
-
-class StippleEffect:
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "dot_size": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.1,
-                    "max": 5.0,
-                    "step": 0.1
-                }),
-                "density": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.1,
-                    "max": 5.0,
-                    "step": 0.1
-                }),
-                "intensity": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.1,
-                    "max": 5.0,
-                    "step": 0.1
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "stipple_effect"
-
-    CATEGORY = "postprocessing"
-
-    def stipple_effect(self, image: torch.Tensor, dot_size: float, density: float, intensity: float):
-        def create_dot_pattern(dot_size, intensity):
-            dot_pattern = torch.ones((1, 1, int(dot_size), int(dot_size))) * intensity
-            return dot_pattern
-
-        x = image.permute(0, 3, 1, 2)
-        gray_image = x.mean(dim=1, keepdim=True)
-        dot_pattern = create_dot_pattern(dot_size, intensity)
-
-        stippled_image = torch.nn.functional.conv2d(gray_image, dot_pattern, stride=int(dot_size), groups=1)
-        stippled_image = torch.clamp(stippled_image, 0, 1)
-
-        output = stippled_image.expand(-1, 3, -1, -1)
-        output = output.permute(0, 2, 3, 1)
-
-        return (output,)
-
 def gaussian_kernel(kernel_size: int, sigma: float):
     x, y = torch.meshgrid(torch.linspace(-1, 1, kernel_size), torch.linspace(-1, 1, kernel_size), indexing="ij")
     d = torch.sqrt(x * x + y * y)
@@ -1460,89 +1236,6 @@ def pixel_sort(img, mask, horizontal_sort=False, span_limit=None, sort_by='H', r
 
     return sorted_image
 
-def kuwahara_filter(img, kernel_size):
-    # Pad the image to handle borders
-    pad_size = kernel_size // 2
-    img_padded = cv2.copyMakeBorder(img, pad_size, pad_size, pad_size, pad_size, cv2.BORDER_REFLECT)
-
-    # Initialize output image
-    h, w = img.shape[:2]
-    out = np.zeros_like(img)
-
-    # Apply Kuwahara filter to each pixel
-    for i in range(pad_size, h + pad_size):
-        for j in range(pad_size, w + pad_size):
-            # Divide the image into 4 overlapping square regions
-            regions = [
-                img_padded[i-pad_size:i+pad_size+1, j-pad_size:j+pad_size+1],
-                img_padded[i-pad_size:i+pad_size+1, j:j+kernel_size+1],
-                img_padded[i:i+kernel_size+1, j-pad_size:j+pad_size+1],
-                img_padded[i:i+kernel_size+1, j:j+kernel_size+1]
-            ]
-
-            # Compute mean and variance of each region
-            means = [np.mean(region) for region in regions]
-            variances = [np.var(region) for region in regions]
-
-            # Choose the region with the smallest variance as the output value
-            min_var_index = np.argmin(variances)
-            out[i-pad_size, j-pad_size] = means[min_var_index]
-
-    return out
-
-
-def kuwahara_filter_rgb(img, kernel_size):
-    # Split the image into color channels
-    b, g, r = cv2.split(img)
-
-    # Apply the filter to each channel
-    b_filtered = kuwahara_filter(b, kernel_size)
-    g_filtered = kuwahara_filter(g, kernel_size)
-    r_filtered = kuwahara_filter(r, kernel_size)
-
-    # Merge the filtered channels back into an RGB image
-    out = cv2.merge((b_filtered, g_filtered, r_filtered))
-
-    return out
-
-
-def apply_filter(args):
-    channel, kernel_size = args
-    return kuwahara_filter(channel, kernel_size)
-
-
-def kuwahara_filter_rgb_multiprocessing(img, kernel_size):
-    # Split the image into color channels
-    b, g, r = cv2.split(img)
-
-    # Function to apply the filter to a channel
-
-    # Create a multiprocessing Pool with 3 processes
-    with mp.Pool(3) as pool:
-        # Map the apply_filter function to the channels
-        b_filtered, g_filtered, r_filtered = pool.map(apply_filter, ((b, kernel_size), (g, kernel_size), (r, kernel_size)))
-
-    # Merge the filtered channels back into an RGB image
-    out = cv2.merge((b_filtered, g_filtered, r_filtered))
-
-    return out
-
-if __name__ == '__main__':
-
-    img = cv2.imread('test.png')
-
-    start_time = time.time()
-    # Apply Kuwahara filter with kernel size of 5
-    out = kuwahara_filter_rgb_multiprocessing(img, kernel_size=5)
-    end_time = time.time()
-    print(f"Time elapsed: {end_time - start_time:.5f} seconds")
-
-    # Display output image
-    cv2.imshow('output_image', out)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-
 NODE_CLASS_MAPPINGS = {
     "ArithmeticBlend": ArithmeticBlend,
     "Blend": Blend,
@@ -1560,11 +1253,8 @@ NODE_CLASS_MAPPINGS = {
     "PixelSort": PixelSort,
     "Pixelize": Pixelize,
     "Quantize": Quantize,
+    "Sepia": Sepia,
     "Sharpen": Sharpen,
     "Solarize": Solarize,
     "Vignette": Vignette,
-    "ElectroShock": ElectroShock,
-    "KuwaharaFilter": KuwaharaFilter,
-    "Liquidify": Liquidify,
-    "StippleEffect": StippleEffect,
 }

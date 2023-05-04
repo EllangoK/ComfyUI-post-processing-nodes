@@ -1,9 +1,5 @@
 from collections import OrderedDict
 from pathlib import Path
-import sys
-import os
-import glob
-import ast
 import argparse
 
 ignore_dirs = ["old"]
@@ -12,7 +8,7 @@ def get_python_files(path, recursive=False, args=None):
     search_pattern = "**/*.py" if recursive else "*.py"
 
     def should_include(file):
-        if file.is_file() and not file.name.startswith("combine") and not args.output in str(file):
+        if file.is_file() and not file.name.startswith("combine") and not args.output in str(file) and not file.name.startswith("__init__"):
             for ignore_dir in ignore_dirs:
                 if ignore_dir in str(file.parent):
                     return False
