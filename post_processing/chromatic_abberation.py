@@ -36,7 +36,7 @@ class ChromaticAberration:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "chromatic_aberration"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def chromatic_aberration(self, image: torch.Tensor, red_shift: int, green_shift: int, blue_shift: int, red_direction: str, green_direction: str, blue_direction: str):
         def get_shift(direction, shift):

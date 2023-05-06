@@ -30,7 +30,7 @@ class CannyEdgeDetection:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "canny"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Masks"
 
     def canny(self, image: torch.Tensor, lower_threshold: int, upper_threshold: int):
         batch_size, height, width, _ = image.shape

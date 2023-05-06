@@ -24,7 +24,7 @@ class Blend:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "blend_images"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Blends"
 
     def blend_images(self, image1: torch.Tensor, image2: torch.Tensor, blend_factor: float, blend_mode: str):
         if image1.shape != image2.shape:

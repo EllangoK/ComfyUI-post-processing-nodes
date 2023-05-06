@@ -22,7 +22,7 @@ class Vignette:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "apply_vignette"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def apply_vignette(self, image: torch.Tensor, vignette: float):
         if vignette == 0:

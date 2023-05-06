@@ -33,7 +33,7 @@ class Parabolize:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "parabolize_image"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Color Adjustments"
 
     def parabolize_image(self, image: torch.Tensor, coeff: float, vertex_x: float, vertex_y: float):
         parabolized_image = coeff * torch.pow(image - vertex_x, 2) + vertex_y

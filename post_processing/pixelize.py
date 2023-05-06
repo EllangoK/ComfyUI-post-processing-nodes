@@ -22,7 +22,7 @@ class Pixelize:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "apply_pixelize"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def apply_pixelize(self, image: torch.Tensor, pixel_size: int):
         pixelized_image = self.pixelize_image(image, pixel_size)

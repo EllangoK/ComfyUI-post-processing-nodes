@@ -27,7 +27,7 @@ class PixelSort:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "sort_pixels"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def sort_pixels(self, image: torch.Tensor, mask: torch.Tensor, direction: str, span_limit: int, sort_by: str, order: str):
         horizontal_sort = direction == "horizontal"

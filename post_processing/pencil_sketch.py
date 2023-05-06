@@ -28,7 +28,7 @@ class PencilSketch:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "apply_sketch"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def apply_sketch(self, image: torch.Tensor, blur_radius: int = 5, sharpen_alpha: float = 1):
         image = image.permute(0, 3, 1, 2)  # Torch wants (B, C, H, W) we use (B, H, W, C)

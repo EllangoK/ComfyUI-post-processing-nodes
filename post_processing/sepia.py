@@ -21,7 +21,7 @@ class Sepia:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "sepia"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Color Adjustments"
 
     def sepia(self, image: torch.Tensor, strength: float):
         if strength == 0:

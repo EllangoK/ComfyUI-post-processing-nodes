@@ -25,7 +25,7 @@ class KuwaharaBlur:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "apply_kuwahara_filter"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Filters"
 
     def apply_kuwahara_filter(self, image: np.ndarray, blur_radius: int, method: str):
         if blur_radius == 0:

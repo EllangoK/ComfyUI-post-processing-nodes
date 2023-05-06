@@ -17,7 +17,7 @@ class ArithmeticBlend:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "arithmetic_blend_images"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Blends"
 
     def arithmetic_blend_images(self, image1: torch.Tensor, image2: torch.Tensor, blend_mode: str):
         if blend_mode == "add":

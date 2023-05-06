@@ -28,7 +28,7 @@ class Glow:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "apply_glow"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def apply_glow(self, image: torch.Tensor, intensity: float, blur_radius: int):
         blurred_image = self.gaussian_blur(image, 2 * blur_radius + 1)

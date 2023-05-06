@@ -55,7 +55,7 @@ class ColorCorrect:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "color_correct"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Color Adjustments"
 
     def color_correct(self, image: torch.Tensor, temperature: float, hue: float, brightness: float, contrast: float, saturation: float, gamma: float):
         batch_size, height, width, _ = image.shape

@@ -29,7 +29,7 @@ class Sharpen:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "sharpen"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Filters"
 
     def sharpen(self, image: torch.Tensor, blur_radius: int, alpha: float):
         if blur_radius == 0:

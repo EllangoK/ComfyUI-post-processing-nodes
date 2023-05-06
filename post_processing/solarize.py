@@ -21,7 +21,7 @@ class Solarize:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "solarize_image"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Color Adjustments"
 
     def solarize_image(self, image: torch.Tensor, threshold: float):
         solarized_image = torch.where(image > threshold, 1 - image, image)

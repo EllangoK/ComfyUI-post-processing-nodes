@@ -22,7 +22,7 @@ class Dissolve:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "dissolve_images"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Blends"
 
     def dissolve_images(self, image1: torch.Tensor, image2: torch.Tensor, dissolve_factor: float):
         dither_pattern = torch.rand_like(image1)

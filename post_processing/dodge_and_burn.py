@@ -23,7 +23,7 @@ class DodgeAndBurn:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "dodge_and_burn"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Blends"
 
     def dodge_and_burn(self, image: torch.Tensor, mask: torch.Tensor, intensity: float, mode: str):
         if mode in ["dodge", "color_dodge", "linear_dodge"]:

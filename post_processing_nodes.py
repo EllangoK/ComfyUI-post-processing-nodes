@@ -24,7 +24,7 @@ class ArithmeticBlend:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "arithmetic_blend_images"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Blends"
 
     def arithmetic_blend_images(self, image1: torch.Tensor, image2: torch.Tensor, blend_mode: str):
         if blend_mode == "add":
@@ -71,7 +71,7 @@ class Blend:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "blend_images"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Blends"
 
     def blend_images(self, image1: torch.Tensor, image2: torch.Tensor, blend_factor: float, blend_mode: str):
         if image1.shape != image2.shape:
@@ -149,7 +149,7 @@ class Blur:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "blur"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Filters"
 
     def blur(self, image: torch.Tensor, blur_radius: int, sigma: float):
         if blur_radius == 0:
@@ -193,7 +193,7 @@ class CannyEdgeDetection:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "canny"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Masks"
 
     def canny(self, image: torch.Tensor, lower_threshold: int, upper_threshold: int):
         batch_size, height, width, _ = image.shape
@@ -244,7 +244,7 @@ class ChromaticAberration:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "chromatic_aberration"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def chromatic_aberration(self, image: torch.Tensor, red_shift: int, green_shift: int, blue_shift: int, red_direction: str, green_direction: str, blue_direction: str):
         def get_shift(direction, shift):
@@ -311,7 +311,7 @@ class ColorCorrect:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "color_correct"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Color Adjustments"
 
     def color_correct(self, image: torch.Tensor, temperature: float, hue: float, brightness: float, contrast: float, saturation: float, gamma: float):
         batch_size, height, width, _ = image.shape
@@ -388,7 +388,7 @@ class Dissolve:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "dissolve_images"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Blends"
 
     def dissolve_images(self, image1: torch.Tensor, image2: torch.Tensor, dissolve_factor: float):
         dither_pattern = torch.rand_like(image1)
@@ -421,7 +421,7 @@ class DodgeAndBurn:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "dodge_and_burn"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Blends"
 
     def dodge_and_burn(self, image: torch.Tensor, mask: torch.Tensor, intensity: float, mode: str):
         if mode in ["dodge", "color_dodge", "linear_dodge"]:
@@ -500,7 +500,7 @@ class FilmGrain:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "film_grain"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def film_grain(self, image: torch.Tensor, intensity: float, scale: float, temperature: float, vignette: float):
         batch_size, height, width, _ = image.shape
@@ -633,7 +633,7 @@ class Glow:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "apply_glow"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def apply_glow(self, image: torch.Tensor, intensity: float, blur_radius: int):
         blurred_image = self.gaussian_blur(image, 2 * blur_radius + 1)
@@ -678,7 +678,7 @@ class KuwaharaBlur:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "apply_kuwahara_filter"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Filters"
 
     def apply_kuwahara_filter(self, image: np.ndarray, blur_radius: int, method: str):
         if blur_radius == 0:
@@ -765,7 +765,7 @@ class Parabolize:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "parabolize_image"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Color Adjustments"
 
     def parabolize_image(self, image: torch.Tensor, coeff: float, vertex_x: float, vertex_y: float):
         parabolized_image = coeff * torch.pow(image - vertex_x, 2) + vertex_y
@@ -799,7 +799,7 @@ class PencilSketch:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "apply_sketch"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def apply_sketch(self, image: torch.Tensor, blur_radius: int = 5, sharpen_alpha: float = 1):
         image = image.permute(0, 3, 1, 2)  # Torch wants (B, C, H, W) we use (B, H, W, C)
@@ -882,7 +882,7 @@ class PixelSort:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "sort_pixels"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def sort_pixels(self, image: torch.Tensor, mask: torch.Tensor, direction: str, span_limit: int, sort_by: str, order: str):
         horizontal_sort = direction == "horizontal"
@@ -922,7 +922,7 @@ class Pixelize:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "apply_pixelize"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def apply_pixelize(self, image: torch.Tensor, pixel_size: int):
         pixelized_image = self.pixelize_image(image, pixel_size)
@@ -963,7 +963,7 @@ class Quantize:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "quantize"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Color Adjustments"
 
     def quantize(self, image: torch.Tensor, colors: int = 256, dither: str = "FLOYDSTEINBERG"):
         batch_size, height, width, _ = image.shape
@@ -1005,7 +1005,7 @@ class Sepia:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "sepia"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Color Adjustments"
 
     def sepia(self, image: torch.Tensor, strength: float):
         if strength == 0:
@@ -1047,7 +1047,7 @@ class Sharpen:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "sharpen"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Filters"
 
     def sharpen(self, image: torch.Tensor, blur_radius: int, alpha: float):
         if blur_radius == 0:
@@ -1091,7 +1091,7 @@ class Solarize:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "solarize_image"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Color Adjustments"
 
     def solarize_image(self, image: torch.Tensor, threshold: float):
         solarized_image = torch.where(image > threshold, 1 - image, image)
@@ -1119,7 +1119,7 @@ class Vignette:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "apply_vignette"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def apply_vignette(self, image: torch.Tensor, vignette: float):
         if vignette == 0:

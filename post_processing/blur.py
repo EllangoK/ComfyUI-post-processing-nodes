@@ -28,7 +28,7 @@ class Blur:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "blur"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Filters"
 
     def blur(self, image: torch.Tensor, blur_radius: int, sigma: float):
         if blur_radius == 0:

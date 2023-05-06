@@ -40,7 +40,7 @@ class FilmGrain:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "film_grain"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Effects"
 
     def film_grain(self, image: torch.Tensor, intensity: float, scale: float, temperature: float, vignette: float):
         batch_size, height, width, _ = image.shape

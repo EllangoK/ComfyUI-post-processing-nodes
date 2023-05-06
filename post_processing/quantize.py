@@ -24,7 +24,7 @@ class Quantize:
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "quantize"
 
-    CATEGORY = "postprocessing"
+    CATEGORY = "postprocessing/Color Adjustments"
 
     def quantize(self, image: torch.Tensor, colors: int = 256, dither: str = "FLOYDSTEINBERG"):
         batch_size, height, width, _ = image.shape
