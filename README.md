@@ -24,6 +24,7 @@ Both images have the workflow attached, and are included with the repo. Feel fre
  - CannyEdgeDetection: Applies Canny edge detection to the input image
  - Chromatic Aberration: Shifts the color channels in an image, creating a glitch aesthetic
  - $\color{#00A7B5}\textbf{ColorCorrect:}$ Adjusts the color balance, temperature, hue, brightness, contrast, saturation, and gamma of an image
+ - $\color{#00A7B5}\textbf{ColorTint:}$ Applies a customizable tint to the input image, with various color modes such as sepia, RGB, CMY and several composite colors
  - Dissolve: Creates a grainy blend of two images using random pixels based on a dissolve factor.
  - DodgeAndBurn: Adjusts image brightness using dodge and burn effects based on a mask and intensity.
  - FilmGrain: Adds a film grain effect to the image, along with options to control the temperature, and vignetting
@@ -34,7 +35,6 @@ Both images have the workflow attached, and are included with the repo. Feel fre
  - $\color{#00A7B5}\textbf{PixelSort:}$ Rearranges the pixels in the input image based on their values, and input mask. Creates a cool glitch like effect.
  - Pixelize: Applies a pixelization effect, simulating the reducing of resolution
  - $\color{#00A7B5}\textbf{Quantize:}$ Set and dither the amount of colors in an image from 0-256, reducing color information
- - Sepia: Applies a mellow tone mapping, yielding an archival or vintage appearance
  - Sharpen: Enhances the details in an image by applying a sharpening filter
  - $\color{#00A7B5}\textbf{Solarize:}$ Inverts image colors based on a threshold for a striking, high-contrast effect
  - Vignette: Applies a vignette effect, putting the corners of the image in shadow
