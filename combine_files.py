@@ -3,12 +3,13 @@ from pathlib import Path
 import argparse
 
 ignore_dirs = ["old"]
+ignore_files = ["__init__.py", "combine_files.py", "test.py"]
 
 def get_python_files(path, recursive=False, args=None):
     search_pattern = "**/*.py" if recursive else "*.py"
 
     def should_include(file):
-        if file.is_file() and not file.name.startswith("combine") and not args.output in str(file) and not file.name.startswith("__init__"):
+        if file.is_file() and not args.output in str(file) and not file.name in ignore_files:
             for ignore_dir in ignore_dirs:
                 if ignore_dir in str(file.parent):
                     return False

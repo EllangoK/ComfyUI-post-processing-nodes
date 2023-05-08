@@ -21,14 +21,15 @@ Both images have the workflow attached, and are included with the repo. Feel fre
  - ArithmeticBlend: Blends two images using arithmetic operations like addition, subtraction, and difference.
  - Blend: Blends two images together with a variety of different modes
  - Blur: Applies a Gaussian blur to the input image, softening the details
- - CannyEdgeDetection: Applies Canny edge detection to the input image
+ - CannyEdgeMask: Creates a mask using canny edge detection
  - Chromatic Aberration: Shifts the color channels in an image, creating a glitch aesthetic
  - $\color{#00A7B5}\textbf{ColorCorrect:}$ Adjusts the color balance, temperature, hue, brightness, contrast, saturation, and gamma of an image
  - $\color{#00A7B5}\textbf{ColorTint:}$ Applies a customizable tint to the input image, with various color modes such as sepia, RGB, CMY and several composite colors
  - Dissolve: Creates a grainy blend of two images using random pixels based on a dissolve factor.
  - DodgeAndBurn: Adjusts image brightness using dodge and burn effects based on a mask and intensity.
- - FilmGrain: Adds a film grain effect to the image, along with options to control the temperature, and vignetting
+ - FilmGrain: Adds a film grain effect to the image, along with options to control the temperature, and vignetting.
  - Glow: Applies a blur with a specified radius and then blends it with the original image. Creates a nice glowing effect.
+ - HSVThresholdMask: Creates a mask by thresholding HSV (hue, saturation, and value) channels
  - $\color{#00A7B5}\textbf{KuwaharaBlur:}$ Applies an edge preserving blur, creating a more realistic blur than Gaussian.
  - Parabolize: Applies a color transformation effect using a parabolic formula
  - PencilSketch: Converts an image into a hand-drawn pencil sketch style.

@@ -3,7 +3,7 @@ import numpy as np
 import torch
 
 
-class CannyEdgeDetection:
+class CannyEdgeMask:
     def __init__(self):
         pass
 
@@ -46,5 +46,5 @@ class CannyEdgeDetection:
         return (result,)
 
 NODE_CLASS_MAPPINGS = {
-    "CannyEdgeDetection": CannyEdgeDetection
+    "CannyEdgeMask": CannyEdgeMask
 }
