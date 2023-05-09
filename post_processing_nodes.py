@@ -1158,7 +1158,7 @@ class SineWave:
             "required": {
                 "image": ("IMAGE",),
                 "amplitude": ("FLOAT", {
-                    "default": 50,
+                    "default": 10,
                     "min": 0,
                     "max": 150,
                     "step": 5
@@ -1169,6 +1169,7 @@ class SineWave:
                     "max": 20,
                     "step": 1
                 }),
+                "direction": (["horizontal", "vertical"],),
             },
         }
 
@@ -1177,24 +1178,29 @@ class SineWave:
 
     CATEGORY = "postprocessing/Effects"
 
-    def apply_sine_wave(self, image: torch.Tensor, amplitude: float, frequency: float):
+    def apply_sine_wave(self, image: torch.Tensor, amplitude: float, frequency: float, direction: str):
         batch_size, height, width, channels = image.shape
         result = torch.zeros_like(image)
 
         for b in range(batch_size):
             tensor_image = image[b]
-            result[b] = self.sine_wave_effect(tensor_image, amplitude, frequency)
+            result[b] = self.sine_wave_effect(tensor_image, amplitude, frequency, direction)
 
         return (result,)
 
-    def sine_wave_effect(self, image: torch.Tensor, amplitude: float, frequency: float):
+    def sine_wave_effect(self, image: torch.Tensor, amplitude: float, frequency: float, direction: str):
         height, width, _ = image.shape
         shifted_image = torch.zeros_like(image)
 
         for channel in range(3):
-            for i in range(height):
-                offset = int(amplitude * np.sin(2 * torch.pi * i * frequency / height))
-                shifted_image[i, :, channel] = torch.roll(image[i, :, channel], offset)
+            if direction == "horizontal":
+                for i in range(height):
+                    offset = int(amplitude * np.sin(2 * torch.pi * i * frequency / height))
+                    shifted_image[i, :, channel] = torch.roll(image[i, :, channel], offset)
+            elif direction == "vertical":
+                for j in range(width):
+                    offset = int(amplitude * np.sin(2 * torch.pi * j * frequency / width))
+                    shifted_image[:, j, channel] = torch.roll(image[:, j, channel], offset)
 
         return shifted_image
 
