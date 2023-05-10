@@ -19,6 +19,7 @@ Both images have the workflow attached, and are included with the repo. Feel fre
 <br/>
 
  - ArithmeticBlend: Blends two images using arithmetic operations like addition, subtraction, and difference.
+ - AsciiArt: Transforms an image into being composed of ASCII characters
  - Blend: Blends two images together with a variety of different modes
  - Blur: Applies a Gaussian blur to the input image, softening the details
  - CannyEdgeMask: Creates a mask using canny edge detection
