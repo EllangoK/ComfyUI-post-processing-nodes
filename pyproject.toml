@@ -1,0 +1,14 @@
+[project]
+name = "comfyui-post-processing-nodes"
+description = "A collection of post processing nodes for ComfyUI, simply download this repo and drag."
+version = "1.0.0"
+license = "LICENSE"
+
+[project.urls]
+Repository = "https://github.com/EllangoK/ComfyUI-post-processing-nodes"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-post-processing-nodes"
+Icon = ""
