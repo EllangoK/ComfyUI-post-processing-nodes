@@ -620,7 +620,7 @@ class FilmGrain:
                     "default": 0.0,
                     "min": 0.0,
                     "max": 10.0,
-                    "step": 1.0
+                    "step": 0.01
                 }),
             },
         }
@@ -728,9 +728,9 @@ class FilmGrain:
         X, Y = np.meshgrid(x, y)
         radius = np.sqrt(X ** 2 + Y ** 2)
 
-        # Map vignette strength from 0-10 to 1.800-0.800
-        mapped_vignette_strength = 1.8 - (vignette_strength - 1) * 0.1
-        vignette = 1 - np.clip(radius / mapped_vignette_strength, 0, 1)
+        radius = radius / np.max(radius)
+        opacity = np.clip(vignette_strength, 0, 1)
+        vignette = 1 - radius * opacity
 
         return np.clip(image * vignette[..., np.newaxis], 0, 1)
 
