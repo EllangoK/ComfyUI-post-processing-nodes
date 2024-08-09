@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-post-processing-nodes"
-description = "A collection of post processing nodes for ComfyUI, simply download this repo and drag."
+description = "A collection of post processing nodes for ComfyUI, which enable a variety of visually striking image effects"
 version = "1.0.0"
 license = "LICENSE"
 
@@ -9,6 +9,6 @@ Repository = "https://github.com/EllangoK/ComfyUI-post-processing-nodes"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "ellangok"
 DisplayName = "ComfyUI-post-processing-nodes"
 Icon = ""
