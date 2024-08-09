@@ -17,7 +17,7 @@ class ArithmeticBlend:
             "required": {
                 "image1": ("IMAGE",),
                 "image2": ("IMAGE",),
-                "blend_mode": (["add", "subtract", "difference"],),
+                "blend_mode": (["add", "subtract", "difference", "divide"],),
             },
         }
 
@@ -33,6 +33,8 @@ class ArithmeticBlend:
             blended_image = self.subtract(image1, image2)
         elif blend_mode == "difference":
             blended_image = self.difference(image1, image2)
+        elif blend_mode == "divide":
+            blended_image = self.divide(image1, image2)
         else:
             raise ValueError(f"Unsupported arithmetic blend mode: {blend_mode}")
 
@@ -47,6 +49,10 @@ class ArithmeticBlend:
 
     def difference(self, img1, img2):
         return torch.abs(img1 - img2)
+
+    def divide(self, img1, img2):
+        img2_safe = torch.where(img1 == 0, torch.tensor(1e-10), img1)
+        return img1 / img2_safe
 
 class AsciiArt:
     def __init__(self):
@@ -1051,7 +1057,7 @@ class PixelSort:
                 "mask": ("IMAGE",),
                 "direction": (["horizontal", "vertical"],),
                 "span_limit": ("INT", {
-                    "default": None,
+                    "default": 50,
                     "min": 0,
                     "max": 100,
                     "step": 5

@@ -14,7 +14,7 @@ class PixelSort:
                 "mask": ("IMAGE",),
                 "direction": (["horizontal", "vertical"],),
                 "span_limit": ("INT", {
-                    "default": None,
+                    "default": 50,
                     "min": 0,
                     "max": 100,
                     "step": 5
