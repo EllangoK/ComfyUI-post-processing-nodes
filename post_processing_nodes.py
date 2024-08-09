@@ -1195,13 +1195,13 @@ class Sharpen:
 
     CATEGORY = "postprocessing/Filters"
 
-    def sharpen(self, image: torch.Tensor, blur_radius: int, alpha: float):
-        if blur_radius == 0:
+    def sharpen(self, image: torch.Tensor, sharpen_radius: int, alpha: float):
+        if sharpen_radius == 0:
             return (image,)
 
         batch_size, height, width, channels = image.shape
 
-        kernel_size = blur_radius * 2 + 1
+        kernel_size = sharpen_radius * 2 + 1
         kernel = torch.ones((kernel_size, kernel_size), dtype=torch.float32) * -1
         center = kernel_size // 2
         kernel[center, center] = kernel_size**2
@@ -1309,11 +1309,11 @@ class Vignette:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "a": ("FLOAT", {
+                "vignette": ("FLOAT", {
                     "default": 0.0,
                     "min": 0.0,
                     "max": 10.0,
-                    "step": 1.0
+                    "step": 0.01
                 }),
             },
         }
@@ -1332,10 +1332,10 @@ class Vignette:
         X, Y = torch.meshgrid(x, y, indexing="ij")
         radius = torch.sqrt(X ** 2 + Y ** 2)
 
-        # Map vignette strength from 0-10 to 1.800-0.800
-        mapped_vignette_strength = 1.8 - (vignette - 1) * 0.1
-        vignette = 1 - torch.clamp(radius / mapped_vignette_strength, 0, 1)
-        vignette = vignette[..., None]
+        radius = radius / torch.amax(radius, dim=(0, 1), keepdim=True)
+        opacity = torch.tensor(vignette, device=image.device)
+        opacity = torch.clamp(opacity, 0.0, 1.0)
+        vignette = 1 - radius.unsqueeze(0).unsqueeze(-1) * opacity
 
         vignette_image = torch.clamp(image * vignette, 0, 1)
 

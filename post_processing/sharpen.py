@@ -31,13 +31,13 @@ class Sharpen:
 
     CATEGORY = "postprocessing/Filters"
 
-    def sharpen(self, image: torch.Tensor, blur_radius: int, alpha: float):
-        if blur_radius == 0:
+    def sharpen(self, image: torch.Tensor, sharpen_radius: int, alpha: float):
+        if sharpen_radius == 0:
             return (image,)
 
         batch_size, height, width, channels = image.shape
 
-        kernel_size = blur_radius * 2 + 1
+        kernel_size = sharpen_radius * 2 + 1
         kernel = torch.ones((kernel_size, kernel_size), dtype=torch.float32) * -1
         center = kernel_size // 2
         kernel[center, center] = kernel_size**2
