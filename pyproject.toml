@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-post-processing-nodes"
 description = "A collection of post processing nodes for ComfyUI, which enable a variety of visually striking image effects"
-version = "1.0.0"
+version = "1.0.1"
 license = "LICENSE"
 
 [project.urls]
