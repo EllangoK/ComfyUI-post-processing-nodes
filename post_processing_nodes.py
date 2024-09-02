@@ -98,7 +98,7 @@ class AsciiArt:
 
 
 def ascii_art_effect(image: torch.Tensor, char_size: int, font_size: int):
-    chars = " .'`^\",:;I1!i><-+_-?][}{1)(|\/tfjrxnuvczXYUCLQ0OZmwqpbdkhao*#MW&8%B@$"
+    chars = r" .'`^\",:;I1!i><-+_-?][}{1)(|\/tfjrxnuvczXYUCLQ0OZmwqpbdkhao*#MW&8%B@$"
     small_image = image.resize((image.size[0] // char_size, image.size[1] // char_size), Image.Resampling.NEAREST)
 
     def get_char(value):
