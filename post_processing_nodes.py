@@ -263,7 +263,7 @@ class CannyEdgeMask:
             },
         }
 
-    RETURN_TYPES = ("IMAGE",)
+    RETURN_TYPES = ("MASK",)
     FUNCTION = "canny"
 
     CATEGORY = "postprocessing/Masks"
@@ -276,7 +276,7 @@ class CannyEdgeMask:
             tensor_image = image[b].numpy().copy()
             gray_image = (cv2.cvtColor(tensor_image, cv2.COLOR_RGB2GRAY) * 255).astype(np.uint8)
             canny = cv2.Canny(gray_image, lower_threshold, upper_threshold)
-            tensor = torch.from_numpy(canny)
+            tensor = torch.from_numpy(canny).float() / 255.
             result[b] = tensor
 
         return (result,)
@@ -815,7 +815,7 @@ class HSVThresholdMask:
             },
         }
 
-    RETURN_TYPES = ("IMAGE",)
+    RETURN_TYPES = ("MASK",)
     FUNCTION = "hsv_threshold"
 
     CATEGORY = "postprocessing/Masks"
